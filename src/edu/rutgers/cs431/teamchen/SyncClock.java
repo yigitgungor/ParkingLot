@@ -1,11 +1,21 @@
 package edu.rutgers.cs431.teamchen;
 
-public class SyncClock {
-    private long currentTime = 0L;
+import java.io.IOException;
+import java.net.Socket;
+import edu.rutgers.cs431.TrafficGeneratorProto.*;
 
-    // TODO
-    public long getTime(){
-        return 0L;
+public class SyncClock {
+    private volatile long currentTime = 0L;
+    private Socket trafGen;
+    public SyncClock(Socket trafGen){
+        this.trafGen = trafGen;
     }
 
+    public long getTime()throws IOException{
+        TimeRequest tr = TimeRequest.getDefaultInstance();
+        tr.writeDelimitedTo(trafGen.getOutputStream());
+        TimeResponse ts = TimeResponse.parseDelimitedFrom(trafGen.getInputStream());
+        this.currentTime = ts.getCurrentTimestamp();
+        return this.currentTime ;
+    }
 }
