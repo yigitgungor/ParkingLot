@@ -17,6 +17,7 @@ public class GateRegisterResponse {
     // The list of all peers gate
     // should be null if the strategy is STRATEGY_NO_SHARED
     public ArrayList<TrafficGeneratorProto.GateAddress> gateAddrs;
+
     // The list of initial tokens provided to this gate
     public ArrayList<String> tokens;
 

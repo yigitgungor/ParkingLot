@@ -20,22 +20,26 @@ import edu.rutgers.cs431.teamchen.proto.GateRegisterResponse;
 public class Gate implements Runnable {
 
     private static final Logger logger = Logger.getLogger("Gate");
-    private final int gatePort;
+    // port to listen to cars from traffic generator
+    private final int gateTcpPort;
+    // port to listen to http requests
+    private final int gateHttpPort;
     // D the cost to transfer the car to the parking lot
     private final long transferDuration;
-    private  SyncClock clock;
     // the carsAcceptor's waiting queue
     private final Queue<Car> waitingQueue;
     private final Lock waitingQLock = new ReentrantLock();
     private final Condition queueNotEmpty = waitingQLock.newCondition();
     private final MonitorConnection monitorConn;
+    private SyncClock clock;
     private TokenStore tokenStore;
     private long totalWaitingTime = 0L;
     private long carsParkedCount = 0L;
 
-    public Gate(String monitorAddr, int monitorPort, int gatePort, long tranferDuration) {
+    public Gate(String monitorAddr, int monitorPort, int gatePort,int httpPort, long tranferDuration) {
         this.waitingQueue = (LinkedList<Car>) Collections.synchronizedList(new LinkedList<Car>());
-        this.gatePort = gatePort;
+        this.gateTcpPort = gatePort;
+        this.gateHttpPort = httpPort;
         this.transferDuration = tranferDuration;
         this.monitorConn = new MonitorConnection(monitorAddr, monitorPort);
     }
@@ -50,7 +54,7 @@ public class Gate implements Runnable {
 
     // registers with the monitor then sets up the state in order to start processing
     public void registerThenInit() {
-        GateRegisterRequest req = new GateRegisterRequest(this.gatePort);
+        GateRegisterRequest req = new GateRegisterRequest(this.gateTcpPort, this.gateHttpPort);
         GateRegisterResponse resp = this.monitorConn.registersGate(req);
 
         // set up the time service
@@ -64,7 +68,7 @@ public class Gate implements Runnable {
         this.clock = new SyncClock(trafGen);
 
         // set up the token distribution strategy
-        switch(resp.strategy){
+        switch (resp.strategy) {
             case GateRegisterResponse.STRATEGY_NO_SHARED:
                 this.tokenStore = new NoShareTokenStore(resp.tokens);
                 break;
@@ -90,7 +94,7 @@ public class Gate implements Runnable {
         log("Starting to accept cars from traffic generator...");
         ServerSocket carAcceptor = null;
         try {
-            carAcceptor = new ServerSocket(gatePort);
+            carAcceptor = new ServerSocket(gateTcpPort);
         } catch (IOException e) {
             reportError("Unable to set up a car accepting socket: " + e.getMessage());
             System.exit(1);
@@ -155,6 +159,7 @@ public class Gate implements Runnable {
             String token = null;
             try {
                 if (this.carIsReadyToDepart(next)) {
+                    // TODO: use this car waiting time
                     continue;
                 }
                 token = this.tokenStore.getToken();
