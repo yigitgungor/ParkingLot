@@ -28,7 +28,7 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
     // D the cost to transfer the car to the parking lot
     private final long transferDuration;
     // the carsAcceptor's waiting queue
-    private final Queue<Car> waitingQueue;
+    private final Queue<CarArrival> waitingQueue;
     private final Lock waitingQLock = new ReentrantLock();
     private final Condition queueNotEmpty = waitingQLock.newCondition();
     private final MonitorConnection monitorConn;
@@ -36,11 +36,11 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
     private SyncClock clock;
     private TokenStore tokenStore;
     private ArrayList<URL> peerHttpAddrs;
-    private long totalWaitingTime = 0L;
-    private long carsParkedCount = 0L;
+    private volatile long totalWaitingTime = 0L;
+    private volatile long carsProcessedCount = 0L;
 
     public Gate(String monitorAddr, int monitorPort, int gatePort, int httpPort, long tranferDuration) {
-        this.waitingQueue = (LinkedList<Car>) Collections.synchronizedList(new LinkedList<Car>());
+        this.waitingQueue = (LinkedList<CarArrival>) Collections.synchronizedList(new LinkedList<CarArrival>());
         this.gateTcpPort = gatePort;
         this.gateHttpPort = httpPort;
         this.transferDuration = tranferDuration;
@@ -153,38 +153,46 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
 
     // add a car to the waiting queue
     private void queueIn(Car car) {
+        long arrivalTime = 0L;
+        try {
+            arrivalTime = this.clock.getTime();
+        } catch (IOException e) {
+            reportError("Unable to get the time for car arrival: " + e.getMessage());
+            return;
+        }
+
+        CarArrival newArrival = new CarArrival(car, arrivalTime);
         this.waitingQLock.lock();
-        this.waitingQueue.add(car);
+        this.waitingQueue.add(newArrival);
         this.queueNotEmpty.signal();
         this.waitingQLock.unlock();
     }
 
-    // returns true if this car is ready to depart
-    private boolean carIsReadyToDepart(Car car) throws IOException {
-        if (this.clock.getTime() > car.getDepartureTimestamp()) {
-            return true;
-        }
-        return false;
-    }
-
-    // processes the car stream, removes a ready-to-depart car, assigns a token to a car,
-    // waits a transferDuration, then send the car to the parking space
+    // processes the car stream, removes a ready-to-depart car or assigns a token to a car,
+    // waits a transferDuration, then sends the car to the parking space
     public void processCarsInQueue() {
         while (true) {
-            Car next = this.nextCar();
+            CarArrival next = this.nextCarArrival();
             String token = null;
+            long currentTime = 0L;
             try {
-                if (this.carIsReadyToDepart(next)) {
-                    // TODO: use this car waiting time
+                currentTime = this.clock.getTime();
+                if (currentTime > next.car.getDepartureTimestamp()) {
+                    totalWaitingTime = currentTime - next.arrivalTime;
+                    carsProcessedCount++;
                     continue;
                 }
                 token = this.tokenStore.getToken();
             } catch (IOException e) {
                 reportError("Unable to check car departing status: " + e.getMessage());
+                continue;
             } catch (InterruptedException e) {
                 reportError("Getting token is interrupted: " + e.getMessage());
+                continue;
             }
-            CarWithToken cwt = new CarWithToken(next, token);
+            totalWaitingTime = currentTime - next.arrivalTime;
+            carsProcessedCount++;
+            CarWithToken cwt = new CarWithToken(next.car, token);
             sendCarToParkingSpace(cwt);
         }
     }
@@ -200,13 +208,13 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
             reportError("Unable to get time: " + e.getMessage());
         }
         // TODO: communication with parking space using HTTP+JSON
-        // Suggestion: abstract this too ?
+        // Suggestion: abstract this communication layer too ?
     }
 
     // processes the car queue.
     // When encountering a car, the method takes it, removes from the queue for processing
     // Otherwise, it waits indefinitely til a car queues in
-    private Car nextCar() {
+    private CarArrival nextCarArrival() {
         try {
             this.waitingQLock.lock();
             while (this.waitingQueue.size() == 0) {
@@ -220,11 +228,20 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
         return null;
     }
 
-
     public void run() {
         this.http(); // http service
         this.registerThenInit(); // registers this gate to the monitor
         this.tcpListensToTrafficGens(); // listens for traffic generator car stream on a TCP/IP socket
         this.processCarsInQueue(); // runs forever as a main thread
+    }
+
+    private static class CarArrival {
+        public Car car;
+        public long arrivalTime;
+
+        public CarArrival(Car car, long arrivalTime) {
+            this.car = car;
+            this.arrivalTime = arrivalTime;
+        }
     }
 }
