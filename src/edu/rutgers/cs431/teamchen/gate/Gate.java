@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.URL;
 import java.util.*;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
@@ -17,7 +18,7 @@ import edu.rutgers.cs431.teamchen.proto.CarWithToken;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterRequest;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterResponse;
 
-public class Gate implements Runnable {
+public class Gate implements Runnable, PeerHttpAddressProvider {
 
     private static final Logger logger = Logger.getLogger("Gate");
     // port to listen to cars from traffic generator
@@ -31,12 +32,14 @@ public class Gate implements Runnable {
     private final Lock waitingQLock = new ReentrantLock();
     private final Condition queueNotEmpty = waitingQLock.newCondition();
     private final MonitorConnection monitorConn;
+    private final Lock peerHttpAddrsLock = new ReentrantLock();
     private SyncClock clock;
     private TokenStore tokenStore;
+    private ArrayList<URL> peerHttpAddrs;
     private long totalWaitingTime = 0L;
     private long carsParkedCount = 0L;
 
-    public Gate(String monitorAddr, int monitorPort, int gatePort,int httpPort, long tranferDuration) {
+    public Gate(String monitorAddr, int monitorPort, int gatePort, int httpPort, long tranferDuration) {
         this.waitingQueue = (LinkedList<Car>) Collections.synchronizedList(new LinkedList<Car>());
         this.gateTcpPort = gatePort;
         this.gateHttpPort = httpPort;
@@ -50,6 +53,20 @@ public class Gate implements Runnable {
 
     private static void log(String msg) {
         logger.info(msg);
+    }
+
+    public ArrayList<URL> getPeerHttpAddresses() {
+        ArrayList<URL> res = null;
+        peerHttpAddrsLock.lock();
+        res = peerHttpAddrs;
+        peerHttpAddrsLock.unlock();
+        return res;
+    }
+
+    public void setPeerHttpAddresses(ArrayList<URL> peerAddrs) {
+        peerHttpAddrsLock.lock();
+        this.peerHttpAddrs = peerAddrs;
+        peerHttpAddrsLock.unlock();
     }
 
     // registers with the monitor then sets up the state in order to start processing
@@ -73,12 +90,11 @@ public class Gate implements Runnable {
                 this.tokenStore = new NoShareTokenStore(resp.tokens);
                 break;
             case GateRegisterResponse.STRATEGY_DISTRIBUTED:
-                // TODO: also a mechanism to share tokens in a constructor
-                this.tokenStore = new DistributedTokenStore(resp.tokens);
+                this.tokenStore = new DistributedTokenStore(resp.tokens, this);
                 break;
             case GateRegisterResponse.STRATEGY_FOR_PROFIT:
                 // TODO:
-                this.tokenStore = new ForProfitTokenStore(resp.tokens);
+                this.tokenStore = new ForProfitTokenStore(resp.tokens, this);
                 break;
         }
     }
