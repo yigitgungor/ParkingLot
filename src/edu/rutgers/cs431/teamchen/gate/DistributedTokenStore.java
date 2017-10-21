@@ -7,12 +7,12 @@ import java.util.concurrent.locks.ReentrantLock;
 // A token distributor that talks to all other token distributors to share them
 //
 // Implements strategy 2
-public class DistributedTokenStore  implements TokenStore {
-    private ArrayList<String> tokens;
+public class DistributedTokenStore implements TokenStore {
     private final Lock lock = new ReentrantLock();
     private final PeerHttpAddressProvider addressProvider;
+    private ArrayList<String> tokens;
 
-    public DistributedTokenStore(ArrayList<String> tokens, PeerHttpAddressProvider addrProvider){
+    public DistributedTokenStore(ArrayList<String> tokens, PeerHttpAddressProvider addrProvider) {
         this.addressProvider = addrProvider;
         this.tokens = tokens;
     }
@@ -35,7 +35,7 @@ public class DistributedTokenStore  implements TokenStore {
     }
 
     @Override
-    public int count(){
+    public int count() {
         // TODO: should we wait?
         return tokens.size();
     }

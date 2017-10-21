@@ -1,22 +1,25 @@
 package edu.rutgers.cs431.teamchen.gate;
 
 
-import java.io.IOException;
-import java.net.InetSocketAddress;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.URL;
-import java.util.*;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Logger;
-
 import edu.rutgers.cs431.TrafficGeneratorProto.Car;
 import edu.rutgers.cs431.teamchen.SyncClock;
 import edu.rutgers.cs431.teamchen.proto.CarWithToken;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterRequest;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterResponse;
+
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.LinkedList;
+import java.util.Queue;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Logger;
 
 public class Gate implements Runnable, PeerHttpAddressProvider {
 
@@ -37,7 +40,7 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
     private TokenStore tokenStore;
     private ArrayList<URL> peerHttpAddrs;
     private volatile long totalWaitingTime = 0L;
-    private volatile long carsProcessedCount = 0L;
+    private volatile int carsProcessedCount = 0;
 
     public Gate(String monitorAddr, int monitorPort, int gatePort, int httpPort, long tranferDuration) {
         this.waitingQueue = (LinkedList<CarArrival>) Collections.synchronizedList(new LinkedList<CarArrival>());
@@ -69,11 +72,25 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
         peerHttpAddrsLock.unlock();
     }
 
+    public void setPeerHttpAddressesFromStr(ArrayList<String> peerAddrs) {
+        ArrayList<URL> addrs = new ArrayList<>();
+        for (String addr : peerAddrs) {
+            try {
+                addrs.add(new URL(addr));
+            } catch (MalformedURLException e) {
+                reportError("Received an malformed peer address: " + addr + " " + e.getMessage());
+                return;
+            }
+        }
+        this.setPeerHttpAddresses(addrs);
+    }
+
     // registers with the monitor then sets up the state in order to start processing
     public void registerThenInit() {
         GateRegisterRequest req = new GateRegisterRequest(this.gateTcpPort, this.gateHttpPort);
         GateRegisterResponse resp = this.monitorConn.registersGate(req);
 
+        this.setPeerHttpAddressesFromStr(resp.gateHttpAddrs);
         // set up the time service
         try {
             this.clock = new SyncClock(resp.trafficGeneratorAddr, resp.trafficGeneratorPort);
@@ -91,7 +108,6 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
                 this.tokenStore = new DistributedTokenStore(resp.tokens, this);
                 break;
             case GateRegisterResponse.STRATEGY_FOR_PROFIT:
-                // TODO:
                 this.tokenStore = new ForProfitTokenStore(resp.tokens, this);
                 break;
         }
@@ -189,7 +205,6 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
 
     // waits a transferDurationTime then sends the car to the parking space.
     private void sendCarToParkingSpace(CarWithToken cwt) {
-
         long passedGateTime = this.clock.getTime() + this.transferDuration;
         while (this.clock.getTime() < passedGateTime) {
             continue;

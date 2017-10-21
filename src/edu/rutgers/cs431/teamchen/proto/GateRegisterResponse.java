@@ -1,8 +1,5 @@
 package edu.rutgers.cs431.teamchen.proto;
 
-import edu.rutgers.cs431.TrafficGeneratorProto;
-
-import java.net.URL;
 import java.util.ArrayList;
 
 public class GateRegisterResponse {
@@ -18,7 +15,7 @@ public class GateRegisterResponse {
 
     // The list of all peers gate
     // should be null if the strategy is STRATEGY_NO_SHARED
-    public ArrayList<URL> gateHttpAddrs;
+    public ArrayList<String> gateHttpAddrs;
 
     // The list of initial tokens provided to this gate
     public ArrayList<String> tokens;

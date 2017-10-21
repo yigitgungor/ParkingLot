@@ -1,7 +1,7 @@
 package edu.rutgers.cs431.teamchen.gate;
 
 public class Main {
-    public static void main(String[] args){
+    public static void main(String[] args) {
         String monitorAddr = args[0];
         int monitorPort = Integer.parseInt(args[1]);
         int gatePort = Integer.parseInt(args[2]);

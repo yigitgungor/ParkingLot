@@ -5,6 +5,5 @@ import java.util.ArrayList;
 
 // Provides addresses of all peers
 public interface PeerHttpAddressProvider {
-     ArrayList<URL> getPeerHttpAddresses();
-     void setPeerHttpAddresses(ArrayList<URL> list);
+    ArrayList<URL> getPeerHttpAddresses();
 }

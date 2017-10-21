@@ -11,17 +11,17 @@ public class CarWithToken {
     public long departureTimestamp;
     public String token;
 
-    public TrafficGeneratorProto.Car getCarProto(){
+    public CarWithToken(TrafficGeneratorProto.Car car, String token) {
+        this.arrivalTimestamp = car.getArrivalTimestamp();
+        this.departureTimestamp = car.getDepartureTimestamp();
+        this.token = token;
+    }
+
+    public TrafficGeneratorProto.Car getCarProto() {
         return TrafficGeneratorProto.Car.newBuilder()
                 .setArrivalTimestamp(this.arrivalTimestamp)
                 .setDepartureTimestamp(this.departureTimestamp)
                 .build();
-    }
-
-    public CarWithToken(TrafficGeneratorProto.Car car, String token){
-        this.arrivalTimestamp = car.getArrivalTimestamp();
-        this.departureTimestamp = car.getDepartureTimestamp();
-        this.token = token;
     }
 
 }
