@@ -42,12 +42,12 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
     private volatile long totalWaitingTime = 0L;
     private volatile int carsProcessedCount = 0;
 
-    public Gate(String monitorAddr, int monitorPort, int gatePort, int httpPort, long tranferDuration) {
+    public Gate(String monitorHttpAddr, int gatePort, int httpPort, long tranferDuration) {
         this.waitingQueue = (LinkedList<CarArrival>) Collections.synchronizedList(new LinkedList<CarArrival>());
         this.gateTcpPort = gatePort;
         this.gateHttpPort = httpPort;
         this.transferDuration = tranferDuration;
-        this.monitorConn = new MonitorConnection(monitorAddr, monitorPort);
+        this.monitorConn = new MonitorConnection(monitorHttpAddr);
     }
 
     private static void reportError(String msg) {
@@ -59,7 +59,7 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
     }
 
     public ArrayList<URL> getPeerHttpAddresses() {
-        ArrayList<URL> res = null;
+        ArrayList<URL> res;
         peerHttpAddrsLock.lock();
         res = peerHttpAddrs;
         peerHttpAddrsLock.unlock();
