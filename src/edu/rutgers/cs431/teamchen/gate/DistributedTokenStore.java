@@ -10,8 +10,10 @@ import java.util.concurrent.locks.ReentrantLock;
 public class DistributedTokenStore  implements TokenStore {
     private ArrayList<String> tokens;
     private final Lock lock = new ReentrantLock();
+    private final PeerHttpAddressProvider addressProvider;
 
-    public DistributedTokenStore(ArrayList<String> tokens){
+    public DistributedTokenStore(ArrayList<String> tokens, PeerHttpAddressProvider addrProvider){
+        this.addressProvider = addrProvider;
         this.tokens = tokens;
     }
 
