@@ -75,14 +75,12 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
         GateRegisterResponse resp = this.monitorConn.registersGate(req);
 
         // set up the time service
-        Socket trafGen = null;
         try {
-            trafGen = new Socket(resp.trafficGeneratorAddr, resp.trafficGeneratorPort);
+            this.clock = new SyncClock(resp.trafficGeneratorAddr, resp.trafficGeneratorPort);
         } catch (IOException e) {
-            reportError("Unable to connect to the traffic generator: " + e.getMessage());
+            reportError("Unable to set up clock synchronization: " + e.getMessage());
             System.exit(1);
         }
-        this.clock = new SyncClock(trafGen);
 
         // set up the token distribution strategy
         switch (resp.strategy) {
@@ -154,12 +152,7 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
     // add a car to the waiting queue
     private void queueIn(Car car) {
         long arrivalTime = 0L;
-        try {
-            arrivalTime = this.clock.getTime();
-        } catch (IOException e) {
-            reportError("Unable to get the time for car arrival: " + e.getMessage());
-            return;
-        }
+        arrivalTime = this.clock.getTime();
 
         CarArrival newArrival = new CarArrival(car, arrivalTime);
         this.waitingQLock.lock();
@@ -183,9 +176,6 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
                     continue;
                 }
                 token = this.tokenStore.getToken();
-            } catch (IOException e) {
-                reportError("Unable to check car departing status: " + e.getMessage());
-                continue;
             } catch (InterruptedException e) {
                 reportError("Getting token is interrupted: " + e.getMessage());
                 continue;
@@ -199,14 +189,12 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
 
     // waits a transferDurationTime then sends the car to the parking space.
     private void sendCarToParkingSpace(CarWithToken cwt) {
-        try {
-            long passedGateTime = this.clock.getTime() + this.transferDuration;
-            while (this.clock.getTime() < passedGateTime) {
-                continue;
-            }
-        } catch (IOException e) {
-            reportError("Unable to get time: " + e.getMessage());
+
+        long passedGateTime = this.clock.getTime() + this.transferDuration;
+        while (this.clock.getTime() < passedGateTime) {
+            continue;
         }
+
         // TODO: communication with parking space using HTTP+JSON
         // Suggestion: abstract this communication layer too ?
     }
