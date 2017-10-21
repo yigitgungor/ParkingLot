@@ -1,3 +1,5 @@
+package edu.rutgers.cs431.teamchen.monitor;
+
 import java.util.Date;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -6,7 +8,7 @@ public class Monitor {
 	
 	public static void main(String[] args)
 	{		
-		System.out.println("Parking Lot Monitor");
+		System.out.println("Parking Lot edu.rutgers.cs431.teamchen.monitor.Monitor");
 		System.out.println("______________________________________");
 		
 		Timer timer = new Timer();

@@ -2,7 +2,7 @@ package edu.rutgers.cs431.teamchen.gate;
 
 
 import edu.rutgers.cs431.TrafficGeneratorProto.Car;
-import edu.rutgers.cs431.teamchen.SyncClock;
+import edu.rutgers.cs431.teamchen.util.SyncClock;
 import edu.rutgers.cs431.teamchen.proto.CarWithToken;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterRequest;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterResponse;

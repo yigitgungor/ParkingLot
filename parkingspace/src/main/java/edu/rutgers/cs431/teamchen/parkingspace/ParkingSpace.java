@@ -1,19 +1,24 @@
-package edu.rutgers.cs431.teamchen;
+package edu.rutgers.cs431.teamchen.parkingspace;
+
+import edu.rutgers.cs431.TrafficGeneratorProto.Car;
+
+import java.util.ArrayList;
+import java.util.Queue;
 
 public class ParkingSpace {
 
 	
-	private final Queue<Car> pSQueue = new Queue<Car>;
+	private final Queue<Car> psQueue = (Queue<Car>) new ArrayList<Car>();
 	private long currentSize = 0L;
 	
 	
 	public void enqueueCar(Queue<Car> pSQueue, Car c){
-		psQueue.enqueue(c);
+		this.psQueue.add(c);
 		currentSize++;
 	}
 	
 	public void dequeueCar(Queue<Car> pSQueue, DepartureQueue departQueue ){
-		departQueue.depart(psQueue.dequeue());
+		departQueue.depart(this.psQueue.remove());
 		currentSize--;
 	}
 	

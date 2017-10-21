@@ -1,4 +1,4 @@
-package edu.rutgers.cs431.teamchen;
+package edu.rutgers.cs431.teamchen.util;
 
 import java.io.IOException;
 import java.net.Socket;
