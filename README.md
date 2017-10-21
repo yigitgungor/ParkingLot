@@ -17,8 +17,10 @@ https://docs.google.com/a/scarletmail.rutgers.edu/document/d/1Ut8PRiIQkKAP8Pt6ml
     1. libs: contains externally imported jars
     
     
-To use TrafficGeneratorProtobuf, include the following dependency to your component's pom.xml
-    ```xml
+To use TrafficGeneratorProtobuf, include the following dependency to your component's pom.xml  
+
+```xml
+
      <project>
      [...]
         <dependencies>
@@ -34,9 +36,10 @@ To use TrafficGeneratorProtobuf, include the following dependency to your compon
         </dependencies>
     [...]
     </project>
-    ```
     
-To use code from another module, include the following dependency to your component's pom.xml
+```
+    
+To use code from another module, include the following dependency to your component's pom.xml  
 .i.e edu.rutgers.cs431.teamchen.util
 ```xml
             ...
