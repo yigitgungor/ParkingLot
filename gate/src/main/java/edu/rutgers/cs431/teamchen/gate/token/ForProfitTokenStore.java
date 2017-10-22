@@ -1,4 +1,4 @@
-package edu.rutgers.cs431.teamchen.gate;
+package edu.rutgers.cs431.teamchen.gate.token;
 
 import java.util.ArrayList;
 

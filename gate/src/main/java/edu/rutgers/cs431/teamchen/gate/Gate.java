@@ -1,17 +1,16 @@
 package edu.rutgers.cs431.teamchen.gate;
 
 
+import com.sun.net.httpserver.HttpServer;
 import edu.rutgers.cs431.TrafficGeneratorProto.Car;
-import edu.rutgers.cs431.teamchen.util.SyncClock;
+import edu.rutgers.cs431.teamchen.gate.token.*;
 import edu.rutgers.cs431.teamchen.proto.CarWithToken;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterRequest;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterResponse;
+import edu.rutgers.cs431.teamchen.util.SyncClock;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.URL;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -24,6 +23,7 @@ import java.util.logging.Logger;
 public class Gate implements Runnable, PeerHttpAddressProvider {
 
     private static final Logger logger = Logger.getLogger("Gate");
+    private static final int MAXIMUM_HTTP_CONNECTION_CAPACITY = 200;
     // port to listen to cars from traffic generator
     private final int gateTcpPort;
     // port to listen to http requests
@@ -56,6 +56,14 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
 
     private static void log(String msg) {
         logger.info(msg);
+    }
+
+    public long getTotalWaitingTime() {
+        return totalWaitingTime;
+    }
+
+    public int getCarsProcessedCount() {
+        return carsProcessedCount;
     }
 
     public ArrayList<URL> getPeerHttpAddresses() {
@@ -115,7 +123,17 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
 
     // starts an http server
     public void http() {
-        // TODO: Creates an HTTP server for the gate
+        HttpServer httpServer = null;
+        try {
+            httpServer = HttpServer.create();
+            httpServer.bind(new InetSocketAddress("localhost", this.gateHttpPort), MAXIMUM_HTTP_CONNECTION_CAPACITY/**/);
+        } catch (IOException e) {
+            reportError("Unable to create the http service for gate: " + e.getMessage());
+            System.exit(1);
+        }
+        httpServer.createContext("/stats", new GateStatHttpHandler(this));
+        httpServer.createContext("/car_leaving", new CarLeavingHttpHandler(this));
+        httpServer.start();
     }
 
     // initiates a thread that listens to traffic generator(s?)
@@ -163,6 +181,11 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
                 }
             }
         };
+    }
+
+    public void onCarLeaving(CarWithToken cwt) {
+        log("New car leaving with token " + cwt.token);
+        this.tokenStore.addToken(cwt.token);
     }
 
     // add a car to the waiting queue
@@ -247,4 +270,5 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
             this.arrivalTime = arrivalTime;
         }
     }
+
 }
