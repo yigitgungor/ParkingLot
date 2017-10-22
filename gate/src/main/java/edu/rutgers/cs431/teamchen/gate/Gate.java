@@ -3,6 +3,7 @@ package edu.rutgers.cs431.teamchen.gate;
 
 import com.sun.net.httpserver.HttpServer;
 import edu.rutgers.cs431.TrafficGeneratorProto.Car;
+import edu.rutgers.cs431.teamchen.gate.token.*;
 import edu.rutgers.cs431.teamchen.proto.CarWithToken;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterRequest;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterResponse;
@@ -131,6 +132,7 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
             System.exit(1);
         }
         httpServer.createContext("/stats", new GateStatHttpHandler(this));
+        httpServer.createContext("/car_leaving", new CarLeavingHttpHandler(this));
         httpServer.start();
     }
 
@@ -179,6 +181,11 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
                 }
             }
         };
+    }
+
+    public void onCarLeaving(CarWithToken cwt) {
+        log("New car leaving with token " + cwt.token);
+        this.tokenStore.addToken(cwt.token);
     }
 
     // add a car to the waiting queue
