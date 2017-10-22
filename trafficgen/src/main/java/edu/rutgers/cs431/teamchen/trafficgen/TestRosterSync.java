@@ -21,7 +21,7 @@ public class TestRosterSync {
       listeningSocket = new ServerSocket(5050);
       // System.out.println(" got here ");
 
-      RosterSync rosterSync = new RosterSync(lh, 5050, 5051);
+      RosterSync rosterSync = new RosterSync(lh, 5050, 5051, false);
       new Thread(rosterSync).start();
       // System.out.println(" and got here ");
       syncSocket = new Socket(lh, 5051);
