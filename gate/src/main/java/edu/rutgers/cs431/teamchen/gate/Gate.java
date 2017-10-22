@@ -12,9 +12,8 @@ import edu.rutgers.cs431.teamchen.util.SyncClock;
 import java.io.IOException;
 import java.net.*;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -44,7 +43,7 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
     private volatile int carsProcessedCount = 0;
 
     public Gate(String monitorHttpAddr, int gatePort, int httpPort, long tranferDuration) {
-        this.waitingQueue = (LinkedList<CarArrival>) Collections.synchronizedList(new LinkedList<CarArrival>());
+        this.waitingQueue = new ConcurrentLinkedQueue<CarArrival>();
         this.gateTcpPort = gatePort;
         this.gateHttpPort = httpPort;
         this.transferDuration = tranferDuration;

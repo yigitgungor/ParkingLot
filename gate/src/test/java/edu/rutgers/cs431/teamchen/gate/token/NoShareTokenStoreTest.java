@@ -1,14 +1,14 @@
 package edu.rutgers.cs431.teamchen.gate.token;
 
+import org.junit.Assert;
 import org.junit.Test;
-import sun.jvm.hotspot.utilities.Assert;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 
 
-public class TestNoShareTokenStore {
+public class NoShareTokenStoreTest {
 
     private static final int TEST_ADD_TRIALS = 20;
 
@@ -41,9 +41,8 @@ public class TestNoShareTokenStore {
             waitGroup.acquire(TEST_ADD_TRIALS);
         } catch (InterruptedException e) {
         }
-        Assert.that(ts.count() == initCount + TEST_ADD_TRIALS, "The amount of tokens after " +
-                "adding concurrently is incorrect, " +
-                "expected: " + (initCount + TEST_ADD_TRIALS) + ", received:" + ts.count());
+
+        Assert.assertEquals(ts.count(), initCount + TEST_ADD_TRIALS);
     }
 
     @Test
@@ -56,9 +55,7 @@ public class TestNoShareTokenStore {
             ts.addToken(Integer.toString(i));
         }
 
-        Assert.that(ts.count() == initCount + TEST_ADD_TRIALS, "The amount of tokens after " +
-                "adding sequentially is incorrect, " +
-                "expected: " + (initCount + TEST_ADD_TRIALS) + ", received:" + ts.count());
+        Assert.assertEquals(ts.count(), initCount + TEST_ADD_TRIALS);
     }
 
 }

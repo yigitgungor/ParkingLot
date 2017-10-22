@@ -32,6 +32,7 @@ public class MonitorConnection {
         Gson gson = new Gson();
 
         HttpURLConnection conn = (HttpURLConnection) (new URL(this.monitor, GATE_REGISTER_PATH)).openConnection();
+        conn.setDoOutput(true);
         OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream());
         gson.toJson(req, writer);
         writer.flush();
