@@ -114,8 +114,12 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
         GateRegisterResponse resp = null;
         try {
             resp = this.monitorConn.registersGate(req);
+        } catch (RuntimeException e) {
+            reportError("unable to register this Gate: " + e.getMessage());
+            System.exit(1);
         } catch (IOException e) {
-            reportError("unable to register this Gate to the Monitor: " + e.getMessage());
+            reportError("unable to register this Gate: " + e.getMessage());
+            System.exit(1);
         }
 
         this.setPeerHttpAddressesFromStr(resp.gateHttpAddrs);
