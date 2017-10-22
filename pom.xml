@@ -39,12 +39,12 @@
     </dependencies>
 
     <modules>
-        <module>util</module>
         <module>gate</module>
         <module>monitor</module>
         <module>parkingspace</module>
-        <module>proto</module>
         <module>trafficgen</module>
+        <module>util</module>
+        <module>proto</module>
     </modules>
 
 </project>
