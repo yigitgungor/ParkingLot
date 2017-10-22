@@ -11,7 +11,7 @@ import edu.rutgers.cs431.TrafficGeneratorProto.GateAddressListResponse;
 
 public class RosterSync implements Runnable {
 
-  private final boolean DEBUG = false;
+  private final boolean DEBUG = true;
   protected List<GateAddress> gateAddressList = null;
   private int monitorPort;
   private InetAddress monitorAddress;
@@ -20,6 +20,7 @@ public class RosterSync implements Runnable {
   private Socket monitorSocket = null;
   private ServerSocket listeningSocket = null;
   private volatile boolean shutdown;
+  private volatile boolean accepting = false;
 
   public RosterSync(InetAddress monitorAddress, int monitorPort, int myPort) {
     this.monitorAddress = monitorAddress;
@@ -41,8 +42,11 @@ public class RosterSync implements Runnable {
   @Override
   public void run() {
     while (!shutdown) {
+      System.out.println("sending req");
       sendGateAddressListRequest();
+      System.out.println("req sent");
       getGateAddressListResponse();
+      System.out.println("got res");
       try {
         Thread.sleep(5000);
       } catch (InterruptedException e) {
@@ -64,7 +68,10 @@ public class RosterSync implements Runnable {
 
   private List<GateAddress> getGateAddressListResponse() {
     try {
-      connectionSocket = listeningSocket.accept();
+      if (!accepting) {
+        connectionSocket = listeningSocket.accept();
+        accepting = true;
+      }
       GateAddressListResponse response =
           GateAddressListResponse.parseDelimitedFrom(connectionSocket.getInputStream());
       if (DEBUG) {
