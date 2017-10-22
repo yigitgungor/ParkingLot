@@ -7,7 +7,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.concurrent.Semaphore;
 
-public class NoShareTokenStoreTest {
+
+public class TestNoShareTokenStore {
 
     private static final int TEST_ADD_TRIALS = 20;
 
