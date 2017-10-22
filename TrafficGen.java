@@ -10,6 +10,8 @@ import java.util.concurrent.TimeUnit;
 import edu.rutgers.cs431.TrafficGeneratorProto.Car;
 // import edu.rutgers.cs431.TrafficGeneratorProto.Car;
 import edu.rutgers.cs431.TrafficGeneratorProto.GateAddress;
+import edu.rutgers.cs431.TrafficGeneratorProto.TimeResponse;
+import edu.rutgers.cs431.TrafficGeneratorProto.TimeRequest;
 
 // Between the monitor and Traffic Generator
 // ASK about the start, should the traffic generator start with an empty List of GateAddresses
@@ -27,6 +29,7 @@ import edu.rutgers.cs431.TrafficGeneratorProto.GateAddress;
 
 public class TrafficGen {
     public final static double FREQ = 5.0;
+    long lastCarTime;
 
     public static int getPoisson(double lambda) {
       double L = Math.exp(-lambda);
@@ -49,7 +52,6 @@ public class TrafficGen {
     public static void main(String[] args) throws IOException {
         int stayingTime = 1000 * 60 * 60 * 2;
 
-
         // create gate list
         String gateHostname = "localhost";
         // int gatePort = 2020;
@@ -65,26 +67,26 @@ public class TrafficGen {
             .setHostname(gateHostname)
             .setPort(2023)
             .build();
-        GateAddress gateAddress4 = GateAddress.newBuilder()
-            .setHostname(gateHostname)
-            .setPort(2024)
-            .build();
-        GateAddress gateAddress5 = GateAddress.newBuilder()
-            .setHostname(gateHostname)
-            .setPort(2025)
-            .build();
-        GateAddress gateAddress6 = GateAddress.newBuilder()
-            .setHostname(gateHostname)
-            .setPort(2026)
-            .build();
+        // GateAddress gateAddress4 = GateAddress.newBuilder()
+        //     .setHostname(gateHostname)
+        //     .setPort(2024)
+        //     .build();
+        // GateAddress gateAddress5 = GateAddress.newBuilder()
+        //     .setHostname(gateHostname)
+        //     .setPort(2025)
+        //     .build();
+        // GateAddress gateAddress6 = GateAddress.newBuilder()
+        //     .setHostname(gateHostname)
+        //     .setPort(2026)
+        //     .build();
         List<GateAddress> gateAddressList = new ArrayList<GateAddress>();
 
         gateAddressList.add(gateAddress1);
         gateAddressList.add(gateAddress2);
         gateAddressList.add(gateAddress3);
-        gateAddressList.add(gateAddress4);
-        gateAddressList.add(gateAddress5);
-        gateAddressList.add(gateAddress6);
+        // gateAddressList.add(gateAddress4);
+        // gateAddressList.add(gateAddress5);
+        // gateAddressList.add(gateAddress6);
 
 
 
@@ -98,13 +100,15 @@ public class TrafficGen {
         // System.out.println(start);
 
 
-
-        ScheduledExecutorService carScheduler = Executors.newScheduledThreadPool(1);
-
+        MyClock timer = new MyClock();
+        ScheduledExecutorService carScheduler = Executors.newScheduledThreadPool(5);
+        // long inTime = System.currentTimeMillis();
 //        Callable<Car> generateCars = new Callable<Car>() {
         Callable<Void> generateCars = new Callable<Void>() {
             public Void call() throws IOException {
-                long inTime = System.currentTimeMillis();
+                // long inTime = System.currentTimeMillis();
+                timer.setTime(System.currentTimeMillis());
+                long inTime = timer.getTime();
                 long outTime = inTime + stayingTime;
                 Car car = Car.newBuilder()
                     .setArrivalTimestamp(inTime)
@@ -112,10 +116,11 @@ public class TrafficGen {
                     .build();
 //                System.out.println(car.getArrivalTimestamp());
 
-                GateAddress gate = gateAddressList.get(getRandomGate(1, 6));
+                GateAddress gate = gateAddressList.get(getRandomGate(0, 2));
                 String hostName = gate.getHostname();
-//                int port = gate.getPort();
-                int port = 2020;
+                int port = gate.getPort();
+                System.out.println(port);
+                // int port = 2020;
                 Socket socket = null;
                 try {
                     InetAddress lh = InetAddress.getByName(hostName);
@@ -133,7 +138,54 @@ public class TrafficGen {
             }
         };
 
+        Callable<Void> listenToTime = new Callable<Void>() {
+            public Void call() throws IOException, InterruptedException {
+                Socket connectionSocket = null;
+                ServerSocket listeningSocket = new ServerSocket(5555);
+                while(true) {
+                    connectionSocket = listeningSocket.accept();
+                    TimeRequest tr = TimeRequest.parseDelimitedFrom(connectionSocket.getInputStream());
+                    long currentTimeStamp = timer.getTime();
+                    TimeResponse timeResponse = TimeResponse.newBuilder()
+                        .setCurrentTimestamp(currentTimeStamp)
+                        .build();
+                    timeResponse.writeDelimitedTo(connectionSocket.getOutputStream());
+                }
+//                 long inTime = System.currentTimeMillis();
+//                 long outTime = inTime + stayingTime;
+//                 Car car = Car.newBuilder()
+//                     .setArrivalTimestamp(inTime)
+//                     .setDepartureTimestamp(outTime)
+//                     .build();
+// //                System.out.println(car.getArrivalTimestamp());
+
+//                 GateAddress gate = gateAddressList.get(getRandomGate(0, 2));
+//                 String hostName = gate.getHostname();
+//                 int port = gate.getPort();
+//                 System.out.println(port);
+//                 // int port = 2020;
+//                 Socket socket = null;
+//                 try {
+//                     InetAddress lh = InetAddress.getByName(hostName);
+//                     socket = new Socket(lh, port);
+//                     long start = System.currentTimeMillis();
+//                     car.writeDelimitedTo(socket.getOutputStream());
+
+//                 }
+//                 finally {
+//                     socket.close();
+//                 }
+//                 carScheduler.schedule(this, getPoisson(FREQ), TimeUnit.SECONDS);
+// //                return car;
+                // return null;
+            }
+        };
+
+
         carScheduler.schedule(generateCars, getPoisson(FREQ), TimeUnit.SECONDS);
+        carScheduler.schedule(listenToTime, 5, TimeUnit.SECONDS);
+        // System.out.println(a);
+
 
 
         // long arrivalTimestamp = 1506451595665L;
