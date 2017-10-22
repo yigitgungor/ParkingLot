@@ -17,38 +17,18 @@ https://docs.google.com/a/scarletmail.rutgers.edu/document/d/1Ut8PRiIQkKAP8Pt6ml
     1. libs: contains externally imported jars
     
     
-To use TrafficGeneratorProtobuf, include the following dependency to your component's pom.xml  
-
-```xml
-
-     <project>
-     [...]
-        <dependencies>
-        [...]
-            <dependency>
-                <groupId>edu.rutgers.cs431</groupId>
-                <artifactId>TrafficGeneratorProtobuf</artifactId>
-                <version>1.0</version>
-                <scope>system</scope>
-                <systemPath>${project.basedir}/../libs/TrafficGeneratorProto.jar</systemPath>
-            </dependency>
-        [...]
-        </dependencies>
-    [...]
-    </project>
-    
-```
-    
 To use code from another module, include the following dependency to your component's pom.xml  
-.i.e edu.rutgers.cs431.teamchen.util
+.i.e a component wants to use edu.rutgers.cs431.teamchen.util
+
+
 ```xml
-            ...
+            [...]
             <dependency>
-                <groupId>edu.rutgers.cs431.teamchen</groupId>
+                <groupId>${project.groupId}</groupId>
                 <artifactId>util</artifactId>
-                <version>1.0</version>
+                <version>${project.version}</version>
             </dependency>
-            ...
+            [...]
  ```
  
  

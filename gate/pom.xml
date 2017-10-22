@@ -1,4 +1,4 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
     <modelVersion>4.0.0</modelVersion>
@@ -15,6 +15,7 @@
     <artifactId>gate</artifactId>
     <description>The Gate Component</description>
     <version>1.0</version>
+    <packaging>pom</packaging>
 
     <!-- project dependencies -->
     <dependencies>
@@ -24,24 +25,7 @@
             <version>4.12</version>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>edu.rutgers.cs431.teamchen</groupId>
-            <artifactId>proto</artifactId>
-            <version>1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>edu.rutgers.cs431.teamchen</groupId>
-            <artifactId>util</artifactId>
-            <version>1.0</version>
-        </dependency>
-        <dependency>
-            <groupId>edu.rutgers.cs431</groupId>
-            <artifactId>TrafficGeneratorProtobuf</artifactId>
-            <version>1.0</version>
-            <scope>system</scope>
-            <systemPath>${project.basedir}/../libs/TrafficGeneratorProto.jar</systemPath>
-        </dependency>
-
+        
         <!-- https://mvnrepository.com/artifact/com.sun.net.httpserver/http -->
         <dependency>
             <groupId>com.sun.net.httpserver</groupId>
@@ -57,7 +41,18 @@
             <version>2.8.2</version>
         </dependency>
 
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>util</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>proto</artifactId>
+            <version>${project.version}</version>
+        </dependency>
 
     </dependencies>
+
 </project>
