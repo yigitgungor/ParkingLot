@@ -1,5 +1,5 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://maven.apache.org/POM/4.0.0"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
 
         <modelVersion>4.0.0</modelVersion>
 
@@ -21,13 +21,30 @@
                 </plugin>
             </plugins>
         </build>
-        <modules>
-                <module>util</module>
-                <module>gate</module>
-                <module>monitor</module>
-                <module>parkingspace</module>
-                <module>proto</module>
-                <module>trafficgen</module>
-        </modules>
+
+    <repositories>
+        <repository>
+            <id>Lib</id>
+            <name>Shared Jar Library</name>
+            <url>file://${project.basedir}/../lib</url>
+        </repository>
+    </repositories>
+
+    <dependencies>
+        <dependency>
+            <groupId>edu.rutgers.cs431</groupId>
+            <artifactId>traffic-generator-protobuf</artifactId>
+            <version>1.0</version>
+        </dependency>
+    </dependencies>
+
+    <modules>
+        <module>util</module>
+        <module>gate</module>
+        <module>monitor</module>
+        <module>parkingspace</module>
+        <module>proto</module>
+        <module>trafficgen</module>
+    </modules>
 
 </project>
