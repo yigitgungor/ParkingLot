@@ -6,11 +6,11 @@ public class GateRegisterRequest {
     // port for TCP service that the traffic generator connects to
     public final int port;
 
-    // HTTP port that provides inter-component http service
-    public final int httpPort;
+    // Http Url that addresses this gate
+    public final String httpUrl;
 
-    public GateRegisterRequest(int port, int httpPort) {
+    public GateRegisterRequest(int port, String httpUrl) {
         this.port = port;
-        this.httpPort = httpPort;
+        this.httpUrl = httpUrl;
     }
 }

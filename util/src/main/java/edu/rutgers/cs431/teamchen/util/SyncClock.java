@@ -1,5 +1,8 @@
 package edu.rutgers.cs431.teamchen.util;
 
+import edu.rutgers.cs431.TrafficGeneratorProto.TimeRequest;
+import edu.rutgers.cs431.TrafficGeneratorProto.TimeResponse;
+
 import java.io.IOException;
 import java.net.Socket;
 import java.util.concurrent.Executors;
@@ -8,14 +11,15 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Logger;
 
-import edu.rutgers.cs431.TrafficGeneratorProto.*;
-
 // A clock that synchronizes with the traffic generator's chronos service
 public class SyncClock {
 
     private static final Logger logger = Logger.getLogger("Gate.SyncClock");
-    private static final long CLOCK_UPDATE_INTERVAL_IN_MILLISECONDS = 10;
-    private final ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
+    private static final long CLOCK_SYNC_INTERVAL_IN_MILLISECONDS = 100;
+    private static final long CLOCK_UPDATE_INTERVAL_IN_MILLISECONDS = 5;
+
+    private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(2);
+    private final ScheduledFuture syncClockThread;
     private final ScheduledFuture updateClockThread;
     private volatile long currentTime = 0L;
     private Socket chronosConn;
@@ -23,8 +27,12 @@ public class SyncClock {
     // creates a clock with a given time service socket
     public SyncClock(Socket chronosConn) {
         this.chronosConn = chronosConn;
-        this.updateClockThread = executor.scheduleWithFixedDelay(
-                () -> this.updateTimeRoutine(),
+        this.currentTime = System.currentTimeMillis();
+        this.syncClockThread = executor.scheduleWithFixedDelay(
+                () -> this.syncTime(),
+                0, CLOCK_SYNC_INTERVAL_IN_MILLISECONDS, TimeUnit.MILLISECONDS);
+        this.updateClockThread = executor.scheduleAtFixedRate(
+                () -> updateTime(CLOCK_UPDATE_INTERVAL_IN_MILLISECONDS),
                 0, CLOCK_UPDATE_INTERVAL_IN_MILLISECONDS, TimeUnit.MILLISECONDS);
     }
 
@@ -33,7 +41,13 @@ public class SyncClock {
         this(new Socket(addr, port));
     }
 
-    private void updateTimeRoutine() {
+    // update the time by adding some seconds
+    private void updateTime(long deltaInMils) {
+        this.currentTime += deltaInMils;
+    }
+
+    // synchronize with the chrono-service
+    private void syncTime() {
         try {
             TimeRequest tr = TimeRequest.getDefaultInstance();
             tr.writeDelimitedTo(this.chronosConn.getOutputStream());

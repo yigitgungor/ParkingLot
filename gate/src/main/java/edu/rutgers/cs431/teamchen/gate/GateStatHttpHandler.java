@@ -7,6 +7,7 @@ import edu.rutgers.cs431.teamchen.proto.GateStatResponse;
 
 import java.io.IOException;
 import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
 
 public class GateStatHttpHandler implements HttpHandler {
     private final Gate gate;
@@ -19,7 +20,7 @@ public class GateStatHttpHandler implements HttpHandler {
     public void handle(HttpExchange exch) throws IOException {
         exch.getRequestBody().close();
 
-        exch.sendResponseHeaders(200, 0);
+        exch.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
         // Construct a response
         GateStatResponse resp = new GateStatResponse();
         resp.totalWaitingTime = gate.getTotalWaitingTime();
