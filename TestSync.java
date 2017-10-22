@@ -23,8 +23,8 @@ public class TestSync {
             ServerSocket listeningSocket = new ServerSocket(6666);
 
             connectionSocket = listeningSocket.accept();
+            while(true){
             GateAddressListRequest a = GateAddressListRequest.parseDelimitedFrom(connectionSocket.getInputStream());
-
             String gateHostname = "localhost";
 // int gatePort = 2020;
             GateAddress gateAddress1 = GateAddress.newBuilder()
@@ -62,7 +62,10 @@ public class TestSync {
             .addAllGateAddress(gateAddressList)
             .build();
             gateAddressListResponse.writeDelimitedTo(connectionSocket.getOutputStream());
-            System.out.println("inside test");
+            // System.out.println("inside test");
+
+            }
+
         }
             finally {
                 // listeningSocket.close();
