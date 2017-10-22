@@ -26,4 +26,17 @@ public class ParkingSpace {
     public DepartCallback onCarWantsDepart(){
         return null;
     }
+    
+    public void http() {
+        HttpServer httpServer = null;
+        try {
+            httpServer = HttpServer.create();
+            httpServer.bind(new InetSocketAddress("localhost", this.gateHttpPort), MAXIMUM_HTTP_CONNECTION_CAPACITY/**/);
+        } catch (IOException e) {
+            reportError("Unable to create the http service for parking space: " + e.getMessage());
+            System.exit(1);
+        }
+        httpServer.createContext("/car_entering", new CarEnteringHttpHandler(this));
+        httpServer.start();
+    }
 }
