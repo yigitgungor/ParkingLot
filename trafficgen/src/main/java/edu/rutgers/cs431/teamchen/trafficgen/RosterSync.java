@@ -2,7 +2,6 @@ package edu.rutgers.cs431.teamchen.trafficgen;
 
 import java.io.IOException;
 import java.net.InetAddress;
-import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
 import edu.rutgers.cs431.TrafficGeneratorProto.GateAddress;
@@ -15,21 +14,15 @@ public class RosterSync implements Runnable {
   protected List<GateAddress> gateAddressList = null;
   private int monitorPort;
   private InetAddress monitorAddress;
-  private int myPort;
-  private Socket connectionSocket = null;
   private Socket monitorSocket = null;
-  private ServerSocket listeningSocket = null;
   private volatile boolean shutdown;
-  private volatile boolean accepting = false;
 
-  public RosterSync(InetAddress monitorAddress, int monitorPort, int myPort, boolean debug) {
+  public RosterSync(InetAddress monitorAddress, int monitorPort, boolean debug) {
     this.monitorAddress = monitorAddress;
     this.monitorPort = monitorPort;
-    this.myPort = myPort;
     this.DEBUG = debug;
 
     try {
-      listeningSocket = new ServerSocket(this.myPort);
       monitorSocket = new Socket(this.monitorAddress, this.monitorPort);
     } catch (IOException e) {
       e.printStackTrace();
@@ -72,12 +65,8 @@ public class RosterSync implements Runnable {
 
   private List<GateAddress> getGateAddressListResponse() {
     try {
-      if (!accepting) {
-        connectionSocket = listeningSocket.accept();
-        accepting = true;
-      }
       GateAddressListResponse response =
-          GateAddressListResponse.parseDelimitedFrom(connectionSocket.getInputStream());
+          GateAddressListResponse.parseDelimitedFrom(monitorSocket.getInputStream());
       if (DEBUG) {
         for (GateAddress x : response.getGateAddressList()) {
           System.out.println("hostname: " + x.getHostname());
@@ -93,8 +82,7 @@ public class RosterSync implements Runnable {
 
   private void close() {
     try {
-      connectionSocket.close();
-      listeningSocket.close();
+      monitorSocket.close();
     } catch (IOException e) {
       e.printStackTrace();
     }
@@ -111,13 +99,5 @@ public class RosterSync implements Runnable {
 
   public InetAddress getMonitorAddress() {
     return this.monitorSocket.getInetAddress();
-  }
-
-  public int getPort() {
-    return this.connectionSocket.getPort();
-  }
-
-  public InetAddress getAddress() {
-    return this.connectionSocket.getInetAddress();
   }
 }

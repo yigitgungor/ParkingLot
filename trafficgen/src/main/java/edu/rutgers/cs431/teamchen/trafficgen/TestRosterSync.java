@@ -14,17 +14,13 @@ public class TestRosterSync {
 
   public static void main(String[] sa) {
     Socket connectionSocket = null;
-    Socket syncSocket = null;
     ServerSocket listeningSocket = null;
     try {
       InetAddress lh = InetAddress.getByName("localhost");
       listeningSocket = new ServerSocket(5050);
-      // System.out.println(" got here ");
 
-      RosterSync rosterSync = new RosterSync(lh, 5050, 5051, false);
+      RosterSync rosterSync = new RosterSync(lh, 5050, false);
       new Thread(rosterSync).start();
-      // System.out.println(" and got here ");
-      syncSocket = new Socket(lh, 5051);
       connectionSocket = listeningSocket.accept();
 
       while (true) {
@@ -58,10 +54,9 @@ public class TestRosterSync {
           GateAddressListResponse gateAddressListResponse =
               GateAddressListResponse.newBuilder().addAllGateAddress(gateAddressList).build();
 
-          gateAddressListResponse.writeDelimitedTo(syncSocket.getOutputStream());
+          gateAddressListResponse.writeDelimitedTo(connectionSocket.getOutputStream());
           System.out.println("RES SENT");
         }
-        // rosterSync.shutdown();
       }
     } catch (IOException e) {
       e.printStackTrace();
