@@ -15,17 +15,15 @@
     <artifactId>gate</artifactId>
     <description>The Gate Component</description>
     <version>1.0</version>
-    <packaging>pom</packaging>
 
     <!-- project dependencies -->
     <dependencies>
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>4.12</version>
+            <version>4.11</version>
             <scope>test</scope>
         </dependency>
-        
         <!-- https://mvnrepository.com/artifact/com.sun.net.httpserver/http -->
         <dependency>
             <groupId>com.sun.net.httpserver</groupId>
@@ -55,4 +53,33 @@
 
     </dependencies>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                        <phase>package</phase>
+                        <configuration>
+                            <descriptorRefs>
+                                <descriptorRef>jar-with-dependencies</descriptorRef>
+                            </descriptorRefs>
+                            <appendAssemblyId>false</appendAssemblyId>
+                            <finalName>gate</finalName>
+                            <archive>
+                                <manifest>
+                                    <mainClass>edu.rutgers.cs431.teamchen.gate.Main</mainClass>
+                                </manifest>
+                            </archive>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+    
 </project>

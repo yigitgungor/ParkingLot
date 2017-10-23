@@ -1,5 +1,7 @@
 package edu.rutgers.cs431.teamchen.gate.token;
 
+import edu.rutgers.cs431.teamchen.util.PeerHttpAddressProvider;
+
 import java.util.ArrayList;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;

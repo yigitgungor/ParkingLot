@@ -1,4 +1,4 @@
-package edu.rutgers.cs431.teamchen.gate;
+package edu.rutgers.cs431.teamchen.parkingspace;
 
 import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpExchange;
@@ -7,12 +7,12 @@ import edu.rutgers.cs431.teamchen.proto.CarWithToken;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 
 public class CarEnteringHttpHandler implements HttpHandler {
 
     private final ParkingSpace ps;
 
-    
     public CarEnteringHttpHandler(ParkingSpace ps) {
         this.ps = ps;
     }
@@ -24,10 +24,10 @@ public class CarEnteringHttpHandler implements HttpHandler {
         CarWithToken cwt = gson.fromJson(reqBody, CarWithToken.class);
         reqBody.close();
 
-        // process this car
-        new Thread(() -> this.ps.onCarEntering(cwt)).start();
-
+        ex.sendResponseHeaders(HttpURLConnection.HTTP_OK, -1);
         // close the http connection
         ex.close();
+        // process this car
+        new Thread(() -> this.ps.onCarEntering(cwt)).start();
     }
 }

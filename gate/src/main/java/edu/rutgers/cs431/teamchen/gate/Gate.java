@@ -3,27 +3,29 @@ package edu.rutgers.cs431.teamchen.gate;
 
 import com.sun.net.httpserver.HttpServer;
 import edu.rutgers.cs431.TrafficGeneratorProto.Car;
-import edu.rutgers.cs431.teamchen.gate.token.*;
+import edu.rutgers.cs431.teamchen.gate.token.DistributedTokenStore;
+import edu.rutgers.cs431.teamchen.gate.token.ForProfitTokenStore;
+import edu.rutgers.cs431.teamchen.gate.token.NoShareTokenStore;
+import edu.rutgers.cs431.teamchen.gate.token.TokenStore;
 import edu.rutgers.cs431.teamchen.proto.CarWithToken;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterRequest;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterResponse;
+import edu.rutgers.cs431.teamchen.util.GateAddressBook;
 import edu.rutgers.cs431.teamchen.util.SyncClock;
+import edu.rutgers.cs431.teamchen.util.SystemConfig;
 
 import java.io.IOException;
 import java.net.*;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedList;
 import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
-public class Gate implements Runnable, PeerHttpAddressProvider {
+public class Gate implements Runnable {
 
     private static final Logger logger = Logger.getLogger("Gate");
-    private static final int MAXIMUM_HTTP_CONNECTION_CAPACITY = 200;
     // port to listen to cars from traffic generator
     private final int gateTcpPort;
     // port to listen to http requests
@@ -35,16 +37,17 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
     private final Lock waitingQLock = new ReentrantLock();
     private final Condition queueNotEmpty = waitingQLock.newCondition();
     private final MonitorConnection monitorConn;
-    private final Lock peerHttpAddrsLock = new ReentrantLock();
+    private final GateAddressBook gateAddressBook = new GateAddressBook();
     private SyncClock clock;
     private TokenStore tokenStore;
-    private ArrayList<URL> peerHttpAddrs;
     private ParkingSpaceConnection parkingSpaceConn;
     private volatile long totalWaitingTime = 0L;
     private volatile int carsProcessedCount = 0;
+    private HttpServer httpServer;
+    private ServerSocket carsAcceptor;
 
     public Gate(String monitorHttpAddr, int gatePort, int httpPort, long tranferDuration) {
-        this.waitingQueue = (LinkedList<CarArrival>) Collections.synchronizedList(new LinkedList<CarArrival>());
+        this.waitingQueue = new ConcurrentLinkedQueue<CarArrival>();
         this.gateTcpPort = gatePort;
         this.gateHttpPort = httpPort;
         this.transferDuration = tranferDuration;
@@ -74,39 +77,12 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
         return carsProcessedCount;
     }
 
-    public ArrayList<URL> getPeerHttpAddresses() {
-        ArrayList<URL> res;
-        peerHttpAddrsLock.lock();
-        res = peerHttpAddrs;
-        peerHttpAddrsLock.unlock();
-        return res;
-    }
-
-    public void setPeerHttpAddresses(ArrayList<URL> peerAddrs) {
-        peerHttpAddrsLock.lock();
-        this.peerHttpAddrs = peerAddrs;
-        peerHttpAddrsLock.unlock();
-    }
-
-    public void setPeerHttpAddressesFromStr(ArrayList<String> peerAddrs) {
-        ArrayList<URL> addrs = new ArrayList<>();
-        for (String addr : peerAddrs) {
-            try {
-                addrs.add(new URL(addr));
-            } catch (MalformedURLException e) {
-                reportError("received an malformed peer address: " + addr + " " + e.getMessage());
-                return;
-            }
-        }
-        this.setPeerHttpAddresses(addrs);
-    }
-
     // registers with the monitor then sets up the state in order to start processing
     public void registerThenInit() {
         GateRegisterRequest req = null;
         try {
-            req = new GateRegisterRequest(this.gateTcpPort,
-                    "http://" + InetAddress.getLocalHost().getHostName() + ":" + Integer.toString(this.gateHttpPort));
+            req = new GateRegisterRequest(
+                    InetAddress.getLocalHost().getHostName(), this.gateTcpPort, this.gateHttpPort);
         } catch (UnknownHostException e) {
             reportError("can't identify localhost: " + e.getMessage());
             System.exit(1);
@@ -122,7 +98,6 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
             System.exit(1);
         }
 
-        this.setPeerHttpAddressesFromStr(resp.gateHttpAddrs);
         // set up the time service
         try {
             this.clock = new SyncClock(resp.trafficGeneratorAddr, resp.trafficGeneratorPort);
@@ -130,10 +105,11 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
             reportError("unable to set up clock synchronization: " + e.getMessage());
             System.exit(1);
         }
+
         try {
-            this.parkingSpaceConn = new ParkingSpaceConnection(resp.parkingLotHttpUrl);
+            this.parkingSpaceConn = new ParkingSpaceConnection(resp.parkingSpaceHttpUrl);
         } catch (IOException e) {
-            reportError("invalid Parking Space's HTTP URL: " + resp.parkingLotHttpUrl + ": " + e.getMessage());
+            reportError("invalid Parking Space's HTTP URL: " + resp.parkingSpaceHttpUrl + ": " + e.getMessage());
         }
 
         // set up the token distribution strategy
@@ -142,26 +118,27 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
                 this.tokenStore = new NoShareTokenStore(resp.tokens);
                 break;
             case GateRegisterResponse.STRATEGY_DISTRIBUTED:
-                this.tokenStore = new DistributedTokenStore(resp.tokens, this);
+                this.tokenStore = new DistributedTokenStore(resp.tokens, gateAddressBook);
                 break;
             case GateRegisterResponse.STRATEGY_FOR_PROFIT:
-                this.tokenStore = new ForProfitTokenStore(resp.tokens, this);
+                this.tokenStore = new ForProfitTokenStore(resp.tokens, gateAddressBook);
                 break;
         }
     }
 
     // starts an http server
     public void http() {
-        HttpServer httpServer = null;
         try {
             httpServer = HttpServer.create();
-            httpServer.bind(new InetSocketAddress("localhost", this.gateHttpPort), MAXIMUM_HTTP_CONNECTION_CAPACITY/**/);
+            httpServer.bind(new InetSocketAddress("localhost", this.gateHttpPort), SystemConfig
+                    .MAXIMUM_HTTP_CONNECTIONS/**/);
         } catch (IOException e) {
             reportError("unable to create the http service for gate: " + e.getMessage());
             System.exit(1);
         }
-        httpServer.createContext("/stats", new GateStatHttpHandler(this));
-        httpServer.createContext("/car_leaving", new CarLeavingHttpHandler(this));
+        httpServer.createContext(SystemConfig.GATE_GET_STATS_PATH, new GateStatsHttpHandler(this));
+        httpServer.createContext(SystemConfig.GATE_PEER_ADDRESS_CHANGE_PATH, this.gateAddressBook);
+        httpServer.createContext(SystemConfig.GATE_CAR_LEAVING_PATH, new CarLeavingHttpHandler(this));
         httpServer.start();
     }
 
@@ -169,15 +146,15 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
     public void tcpListensToTrafficGens() {
         // Creates a car accepting socket
         log("starting to accept cars from traffic generator...");
-        ServerSocket carAcceptor = null;
+
         try {
-            carAcceptor = new ServerSocket(gateTcpPort);
+            this.carsAcceptor = new ServerSocket(this.gateTcpPort);
         } catch (IOException e) {
             reportError("unable to set up a car accepting socket: " + e.getMessage());
             System.exit(1);
         }
 
-        new Thread(this.acceptsGeneratorCarStreams(carAcceptor)).start();
+        new Thread(this.acceptsGeneratorCarStreams(this.carsAcceptor)).start();
     }
 
     // actively listens on the carsAcceptor, and expects a new car stream from
@@ -213,7 +190,7 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
     }
 
     public void onCarLeaving(CarWithToken cwt) {
-        log("new car leaving with token " + cwt.token);
+        log("Leaving Car and Returning Token " + cwt.token);
         this.tokenStore.addToken(cwt.token);
     }
 
@@ -263,6 +240,7 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
         }
         try {
             this.parkingSpaceConn.sendCarToParkingSpace(cwt);
+            logger.info("Car Entering the Parking Space with Token " + cwt.token);
         } catch (IOException e) {
             reportError("unable to send car with token " + cwt.token + " to the parking space: " + e.getMessage());
             this.logger.info("returning token " + cwt.token + " back to the storage");
@@ -289,8 +267,12 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
 
     public void run() {
         this.http(); // http service
-        this.registerThenInit(); // registers this gate to the monitor
+        logger.info("HTTP Service is up at " + httpServer.getAddress().toString() + ".");
         this.tcpListensToTrafficGens(); // listens for traffic generator car stream on a TCP/IP socket
+        logger.info("Listening to Traffic Generator at " + this.carsAcceptor.getInetAddress().toString());
+        this.registerThenInit(); // registers this gate to the monitor
+        logger.info("Gate registered to the monitor.");
+        logger.info("Start processing cars... ");
         this.processCarsInQueue(); // runs forever as a main thread
     }
 
