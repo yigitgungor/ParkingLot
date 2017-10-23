@@ -9,10 +9,10 @@ import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 
-public class GateStatHttpHandler implements HttpHandler {
+public class GateStatsHttpHandler implements HttpHandler {
     private final Gate gate;
 
-    public GateStatHttpHandler(Gate gate) {
+    public GateStatsHttpHandler(Gate gate) {
         this.gate = gate;
     }
 

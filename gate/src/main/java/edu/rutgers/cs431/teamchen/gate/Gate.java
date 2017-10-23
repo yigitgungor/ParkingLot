@@ -8,6 +8,7 @@ import edu.rutgers.cs431.teamchen.proto.CarWithToken;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterRequest;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterResponse;
 import edu.rutgers.cs431.teamchen.util.SyncClock;
+import edu.rutgers.cs431.teamchen.util.SystemConfig;
 
 import java.io.IOException;
 import java.net.*;
@@ -104,8 +105,8 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
     public void registerThenInit() {
         GateRegisterRequest req = null;
         try {
-            req = new GateRegisterRequest(this.gateTcpPort,
-                    "http://" + InetAddress.getLocalHost().getHostName() + ":" + Integer.toString(this.gateHttpPort));
+            req = new GateRegisterRequest(
+                    InetAddress.getLocalHost().getHostName(), this.gateTcpPort, this.gateHttpPort);
         } catch (UnknownHostException e) {
             reportError("can't identify localhost: " + e.getMessage());
             System.exit(1);
@@ -121,7 +122,6 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
             System.exit(1);
         }
 
-        this.setPeerHttpAddressesFromStr(resp.gateHttpAddrs);
         // set up the time service
         try {
             this.clock = new SyncClock(resp.trafficGeneratorAddr, resp.trafficGeneratorPort);
@@ -129,10 +129,11 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
             reportError("unable to set up clock synchronization: " + e.getMessage());
             System.exit(1);
         }
+
         try {
-            this.parkingSpaceConn = new ParkingSpaceConnection(resp.parkingLotHttpUrl);
+            this.parkingSpaceConn = new ParkingSpaceConnection(resp.parkingSpaceHttpUrl);
         } catch (IOException e) {
-            reportError("invalid Parking Space's HTTP URL: " + resp.parkingLotHttpUrl + ": " + e.getMessage());
+            reportError("invalid Parking Space's HTTP URL: " + resp.parkingSpaceHttpUrl + ": " + e.getMessage());
         }
 
         // set up the token distribution strategy
@@ -159,8 +160,9 @@ public class Gate implements Runnable, PeerHttpAddressProvider {
             reportError("unable to create the http service for gate: " + e.getMessage());
             System.exit(1);
         }
-        httpServer.createContext("/stats", new GateStatHttpHandler(this));
-        httpServer.createContext("/car_leaving", new CarLeavingHttpHandler(this));
+        httpServer.createContext(SystemConfig.GATE_GET_STATS_PATH, new GateStatsHttpHandler(this));
+        httpServer.createContext(SystemConfig.GATE_PEER_ADDRESS_CHANGE_PATH, new GatePeerAddressChangeHttpHandler(this));
+        httpServer.createContext(SystemConfig.GATE_CAR_LEAVING_PATH, new CarLeavingHttpHandler(this));
         httpServer.start();
     }
 

@@ -11,11 +11,7 @@ public class GateRegisterResponse {
     public String trafficGeneratorAddr;
     public int trafficGeneratorPort;
 
-    public String parkingLotHttpUrl;
-
-    // The list of all peers gate
-    // should be null if the strategy is STRATEGY_NO_SHARED
-    public ArrayList<String> gateHttpAddrs;
+    public String parkingSpaceHttpUrl;
 
     // The list of initial tokens provided to this gate
     public ArrayList<String> tokens;

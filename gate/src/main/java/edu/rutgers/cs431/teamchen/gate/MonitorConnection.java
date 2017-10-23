@@ -3,6 +3,7 @@ package edu.rutgers.cs431.teamchen.gate;
 import com.google.gson.Gson;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterRequest;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterResponse;
+import edu.rutgers.cs431.teamchen.util.SystemConfig;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -17,7 +18,6 @@ import java.util.logging.Logger;
 public class MonitorConnection {
 
     private static final Logger logger = Logger.getLogger("MonitorConnection");
-    private static final String GATE_REGISTER_PATH = "register";
     private final URL monitor;
 
     public MonitorConnection(String monitorUrl) throws MalformedURLException {
@@ -31,7 +31,7 @@ public class MonitorConnection {
     public GateRegisterResponse registersGate(GateRegisterRequest req) throws IOException, RuntimeException {
         Gson gson = new Gson();
 
-        HttpURLConnection conn = (HttpURLConnection) (new URL(this.monitor, GATE_REGISTER_PATH)).openConnection();
+        HttpURLConnection conn = (HttpURLConnection) (new URL(this.monitor, SystemConfig.MONITOR_GATE_REGISTER_PATH)).openConnection();
         conn.setDoOutput(true);
         OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream());
         gson.toJson(req, writer);
