@@ -7,13 +7,11 @@ import java.util.Queue;
 
 public class DepartureQueue {
 	
+	private final Queue<Car> exitQueue;
+	
 	public DepartureQueue(){
-		Queue<Car> exitQueue = (Queue<Car>) new ArrayList<Car>();
+		this.exitQueue = (Queue<Car>) new ArrayList<Car>();
 		
 	}
 	
-	public void depart(Car c){
-		
-		
-	}
 }

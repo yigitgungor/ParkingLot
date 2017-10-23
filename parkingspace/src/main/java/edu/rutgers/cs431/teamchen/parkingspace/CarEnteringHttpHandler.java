@@ -12,6 +12,7 @@ public class CarEnteringHttpHandler implements HttpHandler {
 
     private final ParkingSpace ps;
 
+    
     public CarEnteringHttpHandler(ParkingSpace ps) {
         this.ps = ps;
     }
