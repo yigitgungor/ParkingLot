@@ -17,10 +17,12 @@ public class TestRosterSync {
     ServerSocket listeningSocket = null;
     try {
       InetAddress lh = InetAddress.getByName("localhost");
-      listeningSocket = new ServerSocket(5050);
+      listeningSocket = new ServerSocket(6666);
 
-      RosterSync rosterSync = new RosterSync(lh, 5050, false);
+      RosterSync rosterSync = new RosterSync(lh, 6666, true);
       new Thread(rosterSync).start();
+
+      System.out.println("hello");
       connectionSocket = listeningSocket.accept();
 
       while (true) {
@@ -36,20 +38,20 @@ public class TestRosterSync {
               GateAddress.newBuilder().setHostname("localhost").setPort(2022).build();
           GateAddress gateAddress3 =
               GateAddress.newBuilder().setHostname("localhost").setPort(2023).build();
-          GateAddress gateAddress4 =
-              GateAddress.newBuilder().setHostname("localhost").setPort(2024).build();
-          GateAddress gateAddress5 =
-              GateAddress.newBuilder().setHostname("localhost").setPort(2025).build();
-          GateAddress gateAddress6 =
-              GateAddress.newBuilder().setHostname("localhost").setPort(2026).build();
+          // GateAddress gateAddress4 =
+          // GateAddress.newBuilder().setHostname("localhost").setPort(2024).build();
+          // GateAddress gateAddress5 =
+          // GateAddress.newBuilder().setHostname("localhost").setPort(2025).build();
+          // GateAddress gateAddress6 =
+          // GateAddress.newBuilder().setHostname("localhost").setPort(2026).build();
 
           List<GateAddress> gateAddressList = new ArrayList<GateAddress>();
           gateAddressList.add(gateAddress1);
           gateAddressList.add(gateAddress2);
           gateAddressList.add(gateAddress3);
-          gateAddressList.add(gateAddress4);
-          gateAddressList.add(gateAddress5);
-          gateAddressList.add(gateAddress6);
+          // gateAddressList.add(gateAddress4);
+          // gateAddressList.add(gateAddress5);
+          // gateAddressList.add(gateAddress6);
 
           GateAddressListResponse gateAddressListResponse =
               GateAddressListResponse.newBuilder().addAllGateAddress(gateAddressList).build();

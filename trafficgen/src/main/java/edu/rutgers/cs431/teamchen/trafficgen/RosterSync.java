@@ -15,7 +15,6 @@ public class RosterSync implements Runnable {
   private int monitorPort;
   private InetAddress monitorAddress;
   private Socket monitorSocket = null;
-  private volatile boolean shutdown;
 
   public RosterSync(InetAddress monitorAddress, int monitorPort, boolean debug) {
     this.monitorAddress = monitorAddress;
@@ -35,21 +34,14 @@ public class RosterSync implements Runnable {
 
   @Override
   public void run() {
-    while (!shutdown) {
-      if (DEBUG)
-        System.out.println("sending req");
-      sendGateAddressListRequest();
-      if (DEBUG)
-        System.out.println("req sent");
-      getGateAddressListResponse();
-      if (DEBUG)
-        System.out.println("got res");
-      try {
-        Thread.sleep(5000);
-      } catch (InterruptedException e) {
-        e.printStackTrace();
-      }
-    }
+    if (DEBUG)
+      System.out.println("sending req");
+    sendGateAddressListRequest();
+    if (DEBUG)
+      System.out.println("req sent");
+    getGateAddressListResponse();
+    if (DEBUG)
+      System.out.println("got res");
     if (DEBUG)
       System.out.println("Shutdown");
   }
@@ -61,6 +53,10 @@ public class RosterSync implements Runnable {
     } catch (IOException e) {
       e.printStackTrace();
     }
+  }
+
+  public List<GateAddress> getGateAddr() {
+    return this.gateAddressList;
   }
 
   private List<GateAddress> getGateAddressListResponse() {
@@ -90,7 +86,6 @@ public class RosterSync implements Runnable {
 
   public void shutdown() {
     close();
-    shutdown = true;
   }
 
   public int getMonitorPort() {
