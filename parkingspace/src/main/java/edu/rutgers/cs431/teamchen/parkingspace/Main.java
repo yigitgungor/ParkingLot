@@ -9,6 +9,7 @@ public class Main {
         int httpPort = Integer.parseInt(args[1]);
         try {
             ParkingSpace parkingSpace = new ParkingSpace(monitorHttpAddr, httpPort);
+            parkingSpace.run();
         } catch (MalformedURLException e) {
             System.err.println("Invalid URL: " + e.getMessage());
             System.exit(1);

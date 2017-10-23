@@ -27,7 +27,7 @@ public class ParkingSpace implements Runnable {
     private final int httpPort;
     private final URL monitorAddr;
     private final GateAddressBook gateAddressBook = new GateAddressBook();
-    private final PriorityQueue<CarWithToken> parkedQ = new PriorityQueue<>(0, new CWTComparator());
+    private final PriorityQueue<CarWithToken> parkedQ = new PriorityQueue<>(new CWTComparator());
     private SyncClock clock;
     private HttpServer httpServer;
     private Lock parkedQLock = new ReentrantLock();
@@ -133,7 +133,7 @@ public class ParkingSpace implements Runnable {
         ParkingSpaceRegisterResponse resp = gson.fromJson(reader, ParkingSpaceRegisterResponse.class);
         reader.close();
         conn.disconnect();
-
+        
         this.clock = new SyncClock(resp.trafGenAddr, resp.trafGenPort);
     }
 

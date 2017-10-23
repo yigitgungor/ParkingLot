@@ -26,7 +26,7 @@ public class Monitor implements Runnable {
 	private static final int DEFAULT_MAX_GATE = 6;
 	private static final int DEFAULT_MAX_PARKING_CAPACITY = 200;
 
-	private static final long STATS_UPDATE_INTERVAL_IN_MILLISECONDS = 100;
+	private static final long STATS_UPDATE_INTERVAL_IN_MILLISECONDS = 2000;
 
 
 	private static final String DEFAULT_HOSTNAME = "localhost";
@@ -58,7 +58,6 @@ public class Monitor implements Runnable {
 		this.maxParkingCapacity = maxParkingCapacity;
 		this.tokenReservoir = new TokenReservoir.Basic(this.maxParkingCapacity, this.maxGate);
 	}
-
 	public Monitor(int httpPort, int strategy) throws UnknownHostException {
 		this(httpPort, strategy, DEFAULT_MAX_GATE, DEFAULT_MAX_PARKING_CAPACITY);
 	}
@@ -81,7 +80,7 @@ public class Monitor implements Runnable {
 			writer.close();
 			conn.disconnect();
 		} catch (MalformedURLException e) {
-			reportError("sendAddrChangeToGate: invalid gate URL? How does this happen");
+			reportError("sendAddrChangeToGate: invalid gate URL? How does this happen? " + e.getMessage());
 		} catch (IOException e) {
 			reportError("problem sending peer update request to gate " + gateUrl.toString() + ": " + e
 					.getMessage());
@@ -125,12 +124,21 @@ public class Monitor implements Runnable {
 			info.totalWaitingTime = gsr.totalWaitingTime;
 			info.totalCarsProcessed = gsr.totalCarsProcessed;
 		} catch (MalformedURLException ex) {
-			reportError("updateStatesFromGateAt " + info.httpAddress + ": invalid url?");
+			reportError("updateStatesFromGateAt " + info.httpAddress + ": invalid url? " + ex.getMessage());
 			return;
 		} catch (IOException ex) {
-			reportError("problem sending update stats request to gate");
+			reportError("problem sending update stats request to gate at " + info.httpAddress + " " + ex
+					.getMessage());
 			return;
 		}
+	}
+
+	public int getTrafGenPort() {
+		return trafGenPort;
+	}
+
+	public String getTrafGenAddr() {
+		return trafGenAddr;
 	}
 
 	// sends to all gates a new list of gate http addresses
@@ -213,6 +221,7 @@ public class Monitor implements Runnable {
 
 	public void onParkingSpaceRegister(ParkingSpaceRegisterRequest req) {
 		this.parkingSpaceHttpAddr = "http://" + req.hostname + ":" + Integer.toString(req.httpPort);
+		logger.info("A Parking Space registered at " + this.parkingSpaceHttpAddr);
 	}
 
 	private void http() {
@@ -247,7 +256,9 @@ public class Monitor implements Runnable {
 						.build().writeDelimitedTo(socket.getOutputStream());
 			}
 		} catch (IOException e) {
-			reportError("unable to read from the roster request stream: " + e.getMessage());
+			reportError("problem with the traffic generator's roster request stream: " + e
+					.getMessage
+							());
 			return;
 		}
 	}
@@ -257,9 +268,11 @@ public class Monitor implements Runnable {
 		try {
 			ServerSocket serv = new ServerSocket();
 			serv.bind(new InetSocketAddress("localhost", this.tcpPort));
-			logger.info("Accepting Traffic Generator connections at " + serv.getInetAddress().toString());
+			logger.info("Accepting Traffic Generator connections at " + serv.getLocalSocketAddress());
 			while (true) {
 				final Socket socket = serv.accept();
+				logger.info("Accepted a traffic generator @" + socket.getLocalSocketAddress()
+						.toString());
 				rosterRequestStreamHandler(socket);
 			}
 		} catch (IOException e) {

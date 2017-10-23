@@ -4,9 +4,12 @@ import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import edu.rutgers.cs431.teamchen.proto.ParkingSpaceRegisterRequest;
+import edu.rutgers.cs431.teamchen.proto.ParkingSpaceRegisterResponse;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
 
 public class ParkingSpaceRegisterHttpHandler implements HttpHandler {
 
@@ -22,8 +25,17 @@ public class ParkingSpaceRegisterHttpHandler implements HttpHandler {
         Gson gson = new Gson();
         ParkingSpaceRegisterRequest reg = gson.fromJson(in, ParkingSpaceRegisterRequest.class);
         in.close();
+        ex.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
+
+
+        ParkingSpaceRegisterResponse resp = new ParkingSpaceRegisterResponse();
+        resp.trafGenAddr = mon.getTrafGenAddr();
+        resp.trafGenPort = mon.getTrafGenPort();
+        OutputStreamWriter writer = new OutputStreamWriter(ex.getResponseBody());
+        gson.toJson(resp, writer);
+        writer.flush();
+        writer.close();
         ex.close();
         new Thread(() -> mon.onParkingSpaceRegister(reg)).start();
-
     }
 }

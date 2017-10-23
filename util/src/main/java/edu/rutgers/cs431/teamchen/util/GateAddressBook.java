@@ -7,6 +7,7 @@ import edu.rutgers.cs431.teamchen.proto.GateHttpAddressesChangeRequest;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
@@ -48,6 +49,8 @@ public class GateAddressBook implements HttpHandler, PeerHttpAddressProvider {
         InputStreamReader reader = new InputStreamReader(ex.getRequestBody());
         GateHttpAddressesChangeRequest req = gson.fromJson(reader, GateHttpAddressesChangeRequest.class);
         reader.close();
+
+        ex.sendResponseHeaders(HttpURLConnection.HTTP_OK, -1);
         ex.close();
 
         if (req.index >= 0) { // ignore < 0 index

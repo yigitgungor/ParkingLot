@@ -40,7 +40,7 @@ public class MonitorConnection {
 
         GateRegisterResponse grr = null;
         int code = conn.getResponseCode();
-        if (code != HttpURLConnection.HTTP_OK) { // success
+        if (code == HttpURLConnection.HTTP_OK) { // success
             InputStreamReader reader = new InputStreamReader(conn.getInputStream());
             grr = gson.fromJson(reader, GateRegisterResponse.class);
             reader.close();
