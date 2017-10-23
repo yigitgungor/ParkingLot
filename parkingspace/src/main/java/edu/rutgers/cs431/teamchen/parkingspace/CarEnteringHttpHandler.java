@@ -1,4 +1,4 @@
-package edu.rutgers.cs431.teamchen.gate;
+package edu.rutgers.cs431.teamchen.parkingspace;
 
 import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpExchange;

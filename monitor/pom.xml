@@ -68,7 +68,7 @@
                             <finalName>monitor</finalName>
                             <archive>
                                 <manifest>
-                                    <mainClass>edu.rutgers.cs431.teamchen.monitor.Monitor</mainClass>
+                                    <mainClass>edu.rutgers.cs431.teamchen.monitor.Main</mainClass>
                                 </manifest>
                             </archive>
                         </configuration>

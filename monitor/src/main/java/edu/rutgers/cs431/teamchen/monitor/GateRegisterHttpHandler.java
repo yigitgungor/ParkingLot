@@ -34,6 +34,7 @@ public class GateRegisterHttpHandler implements HttpHandler {
         ex.sendResponseHeaders(HttpURLConnection.HTTP_OK, 0);
         OutputStreamWriter writer = new OutputStreamWriter(ex.getResponseBody());
         gson.toJson(resp, writer);
+        writer.flush();
         writer.close();
         ex.close();
 

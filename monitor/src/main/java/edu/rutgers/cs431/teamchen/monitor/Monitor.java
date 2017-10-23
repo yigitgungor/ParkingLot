@@ -47,6 +47,7 @@ public class Monitor implements Runnable {
 	private SyncClock clock;
 	private volatile String parkingSpaceHttpAddr;
 	private volatile String trafGenAddr;
+	private HttpServer httpServ;
 
 	public Monitor(int httpPort, int strategy, int maxGate, long maxParkingCapacity) throws UnknownHostException {
 		this.gates = Collections.synchronizedList(new ArrayList<>());
@@ -66,18 +67,7 @@ public class Monitor implements Runnable {
 		logger.warning(msg);
 	}
 
-	// sends to all gates a new list of gate http addresses
-	public void propagateAddressChange() {
-		gatesLock.lock();
-		for (int i = 0; i < this.gates.size(); i++) {
-			final int temp = i;
-			new Thread(() -> sendAddrChangeToGate(makeGateHttpAddressesChangeRequest(temp))).start();
-		}
-		gatesLock.unlock();
-
-	}
-
-	private void sendAddrChangeToGate(GateHttpAddressesChangeRequest req) {
+	private static void sendAddrChangeToGate(GateHttpAddressesChangeRequest req) {
 		URL gateUrl = null;
 		try {
 			gateUrl = new URL(new URL(req.gateHttpAddrs.get(req.index)), SystemConfig.GATE_PEER_ADDRESS_CHANGE_PATH);
@@ -87,6 +77,7 @@ public class Monitor implements Runnable {
 			OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream());
 			Gson gson = new Gson();
 			gson.toJson(req, writer);
+			writer.flush();
 			writer.close();
 			conn.disconnect();
 		} catch (MalformedURLException e) {
@@ -95,6 +86,64 @@ public class Monitor implements Runnable {
 			reportError("problem sending peer update request to gate " + gateUrl.toString() + ": " + e
 					.getMessage());
 		}
+	}
+
+	private static void sendAddrChangeToParkingSpace(GateHttpAddressesChangeRequest req, String parkingSpaceHttpAddr) {
+		URL gateUrl = null;
+		try {
+			gateUrl = new URL(new URL(parkingSpaceHttpAddr), SystemConfig.PARKING_SPACE_PEER_ADDRESS_CHANGE_PATH);
+			HttpURLConnection conn = (HttpURLConnection) gateUrl.openConnection();
+
+			conn.setDoOutput(true);
+			OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream());
+			Gson gson = new Gson();
+			gson.toJson(req, writer);
+			writer.flush();
+			writer.close();
+			conn.disconnect();
+		} catch (MalformedURLException e) {
+			reportError("sendAddrChangeToGate: invalid parking space URL? How does this happen");
+		} catch (IOException e) {
+			reportError("problem sending peer update request to the parking space " + gateUrl.toString() +
+					": " + e
+					.getMessage());
+		}
+	}
+
+	// using the address in GateInfo updates this gate
+	private static void updateStatsFromGateAt(GateInfo info) {
+		URL gateUrl = null;
+		try {
+			gateUrl = new URL(new URL(info.httpAddress), SystemConfig.GATE_GET_STATS_PATH);
+			HttpURLConnection conn = (HttpURLConnection) gateUrl.openConnection();
+
+			InputStreamReader in = new InputStreamReader(conn.getInputStream());
+			Gson gson = new Gson();
+			GateStatResponse gsr = gson.fromJson(in, GateStatResponse.class);
+			in.close();
+			conn.disconnect();
+			info.totalWaitingTime = gsr.totalWaitingTime;
+			info.totalCarsProcessed = gsr.totalCarsProcessed;
+		} catch (MalformedURLException ex) {
+			reportError("updateStatesFromGateAt " + info.httpAddress + ": invalid url?");
+			return;
+		} catch (IOException ex) {
+			reportError("problem sending update stats request to gate");
+			return;
+		}
+	}
+
+	// sends to all gates a new list of gate http addresses
+	public void propagateAddressChange() {
+		gatesLock.lock();
+		for (int i = 0; i < this.gates.size(); i++) {
+			final int temp = i;
+			new Thread(() -> sendAddrChangeToGate(makeGateHttpAddressesChangeRequest(temp))).start();
+		}
+		new Thread(() -> sendAddrChangeToParkingSpace(makeGateHttpAddressesChangeRequest(-1), this
+				.parkingSpaceHttpAddr)).start();
+		gatesLock.unlock();
+
 	}
 
 	// make a gate address list update request to the gate's http server
@@ -118,28 +167,6 @@ public class Monitor implements Runnable {
 		}
 		gatesLock.unlock();
 
-	}
-
-	private void updateStatsFromGateAt(GateInfo info) {
-		URL gateUrl = null;
-		try {
-			gateUrl = new URL(new URL(info.httpAddress), SystemConfig.GATE_GET_STATS_PATH);
-			HttpURLConnection conn = (HttpURLConnection) gateUrl.openConnection();
-			
-			InputStreamReader in = new InputStreamReader(conn.getInputStream());
-			Gson gson = new Gson();
-			GateStatResponse gsr = gson.fromJson(in, GateStatResponse.class);
-			in.close();
-			conn.disconnect();
-			info.totalWaitingTime = gsr.totalWaitingTime;
-			info.totalCarsProcessed = gsr.totalCarsProcessed;
-		} catch (MalformedURLException ex) {
-			reportError("updateStatesFromGateAt " + info.httpAddress + ": invalid url?");
-			return;
-		} catch (IOException ex) {
-			reportError("problem sending update stats request to gate");
-			return;
-		}
 	}
 
 	public boolean ableToStart() {
@@ -189,10 +216,11 @@ public class Monitor implements Runnable {
 	}
 
 	private void http() {
-		HttpServer httpServ = null;
+		httpServ = null;
 		try {
 			httpServ = HttpServer.create();
-			httpServ.bind(new InetSocketAddress("localhost", this.httpPort), 0);
+			httpServ.bind(new InetSocketAddress("localhost", this.httpPort), SystemConfig
+					.MAXIMUM_HTTP_CONNECTIONS);
 		} catch (IOException e) {
 			logger.warning("unable to set up an http server: " + e.getMessage());
 		}
@@ -229,6 +257,7 @@ public class Monitor implements Runnable {
 		try {
 			ServerSocket serv = new ServerSocket();
 			serv.bind(new InetSocketAddress("localhost", this.tcpPort));
+			logger.info("Accepting Traffic Generator connections at " + serv.getInetAddress().toString());
 			while (true) {
 				final Socket socket = serv.accept();
 				rosterRequestStreamHandler(socket);
@@ -247,7 +276,9 @@ public class Monitor implements Runnable {
 
 	public void run() {
 		this.http();
+		logger.info("HTTP Service is up at " + httpServ.getAddress().toString());
 		this.scheduleStatsUpdate();
+		logger.info("Periodically update gate's status.");
 		this.listensTCPForTrafGen();
 	}
 

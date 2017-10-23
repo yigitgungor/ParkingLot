@@ -27,7 +27,6 @@ public class ParkingSpaceConnection {
         // Construct a connection
         HttpURLConnection conn = (HttpURLConnection) new URL(this.parkingSpace, SystemConfig.PARKING_SPACE_CAR_ENTERING_PATH).openConnection();
         conn.setDoOutput(true); // For POST requests
-        conn.setRequestMethod("POST");
         // Write to body
         OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream());
         Gson gson = new Gson();
