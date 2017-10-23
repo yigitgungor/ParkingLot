@@ -137,6 +137,8 @@ public class Monitor implements Runnable {
 		return trafGenPort;
 	}
 
+
+	
 	public String getTrafGenAddr() {
 		return trafGenAddr;
 	}
@@ -174,6 +176,23 @@ public class Monitor implements Runnable {
 			new Thread(() -> updateStatsFromGateAt(gi)).start();
 		}
 		gatesLock.unlock();
+		
+		System.out.println("\n");
+		System.out.println("Monitor Update");
+		System.out.println("_______________________________________________________");
+		System.out.println("\n");
+		for(GateInfo gate : this.gates)
+		{
+			 System.out.println("--Gate Update--");
+			 System.out.println("\nGate:\n"+ gate.addr+
+					 			"\nWait time: "+gate.totalWaitingTime+
+					 			"\nCars processed: "+gate.totalCarsProcessed);
+
+			 System.out.println("____________________\n");
+		}
+		System.out.println("\n");
+		System.out.println("\n");
+
 
 	}
 
