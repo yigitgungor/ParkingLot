@@ -1,6 +1,8 @@
 # ParkingLot
 Parking lot project for Software Engineering (CS431)
 
+ReadMe at:
+https://docs.google.com/document/d/1HA8nx6g8Ltf96T_8YNRSFqmxps6ZXxDZFDM79IanhPo/edit?usp=sharing
 Documentation at: 
 https://docs.google.com/a/scarletmail.rutgers.edu/document/d/1Ut8PRiIQkKAP8Pt6mlKKI-pMn9Hpf7o2yxpGHhfwEqk/edit?usp=sharing
 
