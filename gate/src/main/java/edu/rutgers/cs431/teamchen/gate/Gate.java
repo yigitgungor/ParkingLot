@@ -1,6 +1,7 @@
 package edu.rutgers.cs431.teamchen.gate;
 
 
+import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpServer;
 import edu.rutgers.cs431.TrafficGeneratorProto.Car;
 import edu.rutgers.cs431.teamchen.gate.token.DistributedTokenStore;
@@ -148,29 +149,38 @@ public class Gate implements Runnable {
         log("starting to accept cars from traffic generator...");
 
         try {
-            this.carsAcceptor = new ServerSocket(this.gateTcpPort);
+            this.carsAcceptor = new ServerSocket();
+            this.carsAcceptor.bind(new InetSocketAddress("localhost", this.gateTcpPort));
+            new Thread(() -> this.acceptsGeneratorCarStreams(this.carsAcceptor)).start();
         } catch (IOException e) {
             reportError("unable to set up a car accepting socket: " + e.getMessage());
             System.exit(1);
         }
 
-        new Thread(this.acceptsGeneratorCarStreams(this.carsAcceptor)).start();
     }
 
     // actively listens on the carsAcceptor, and expects a new car stream from
     // a traffic generator
-    private Runnable acceptsGeneratorCarStreams(ServerSocket gateSocket) {
+    private void acceptsGeneratorCarStreams(ServerSocket gateSocket) {
         final Gate gate = this;
-        return () -> {
-            while (true) {
-                try (Socket carStream = gateSocket.accept()) {
-                    // handles the car stream on a thread for each new traffic generator
-                    new Thread(gate.makeCarStreamHandler(carStream)).start();
-                } catch (Exception e) {
-                    reportError("accepting a new car stream: " + e.getMessage());
+
+        while (true) {
+            try {
+                Socket carStream = gateSocket.accept();
+                logger.info("accepts a car stream from " + carStream.getLocalSocketAddress().toString());
+                // handles the car stream on a thread for each new traffic generator
+                new Thread(gate.makeCarStreamHandler(carStream)).start();
+
+            } catch (Exception e) {
+                reportError("Problem accepting a new car stream: " + e.getMessage());
+            } finally {
+                try {
+                    gateSocket.close();
+                } catch (IOException e) {
+                    reportError("Unable to close the gate TCP server socket");
                 }
             }
-        };
+        }
     }
 
     // returns a thread that handles incoming car stream
@@ -180,6 +190,7 @@ public class Gate implements Runnable {
             while (true) {
                 try {
                     Car car = Car.parseDelimitedFrom(incomingCarSocket.getInputStream());
+                    logger.info("Car entering from the traffic generator: " + new Gson().toJson(car).toString());
                     gate.queueIn(car);
                 } catch (IOException e) {
                     reportError("cannot receive car from traffic generator: " + e.getMessage());
@@ -269,7 +280,7 @@ public class Gate implements Runnable {
         this.http(); // http service
         logger.info("HTTP Service is up at " + httpServer.getAddress().toString() + ".");
         this.tcpListensToTrafficGens(); // listens for traffic generator car stream on a TCP/IP socket
-        logger.info("Listening to Traffic Generator at " + this.carsAcceptor.getInetAddress().toString());
+        logger.info("Listening to Traffic Generator at " + this.carsAcceptor.getLocalSocketAddress().toString());
         this.registerThenInit(); // registers this gate to the monitor
         logger.info("Gate registered to the monitor.");
         logger.info("Start processing cars... ");

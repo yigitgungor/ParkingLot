@@ -70,7 +70,8 @@ public class TrafficGen {
                     InetAddress lh = InetAddress.getByName(hostName);
                     socket = new Socket(lh, port);
                     car.writeDelimitedTo(socket.getOutputStream());
-
+                } catch (IOException e) {
+                    System.err.println(e);
                 } finally {
                     socket.close();
                 }

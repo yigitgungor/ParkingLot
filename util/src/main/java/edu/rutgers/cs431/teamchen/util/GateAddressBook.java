@@ -14,8 +14,8 @@ import java.util.ArrayList;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
-// manages gate addressing
-// doesn't store the http address of the one holding this object
+// Manages gate addressing
+// Address book will not keep the address of the process holding this object
 public class GateAddressBook implements HttpHandler, PeerHttpAddressProvider {
 
     private final Lock peerHttpAddrsLock = new ReentrantLock();
