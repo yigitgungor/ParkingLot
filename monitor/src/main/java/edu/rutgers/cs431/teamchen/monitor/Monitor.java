@@ -19,6 +19,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Function;
 import java.util.logging.Logger;
 
 public class Monitor implements Runnable {
@@ -66,10 +67,11 @@ public class Monitor implements Runnable {
 		logger.warning(msg);
 	}
 
-	private static void sendAddrChangeToGate(GateHttpAddressesChangeRequest req) {
+	private static void sendAddrChangeToGate(GateHttpAddressesChangeRequest req, int gateIndex) {
 		URL gateUrl = null;
 		try {
-			gateUrl = new URL(new URL(req.gateHttpAddrs.get(req.index)), SystemConfig.GATE_PEER_ADDRESS_CHANGE_PATH);
+			gateUrl = new URL(new URL(req.gateHttpAddrs.get(gateIndex)), SystemConfig
+					.GATE_PEER_ADDRESS_CHANGE_PATH);
 			HttpURLConnection conn = (HttpURLConnection) gateUrl.openConnection();
 
 			conn.setDoOutput(true);
@@ -143,29 +145,76 @@ public class Monitor implements Runnable {
 		return trafGenAddr;
 	}
 
-	// sends to all gates a new list of gate http addresses
-	public void propagateAddressChange() {
+	// sends to gates that need to have the address change and notifies the parking space
+	// For a gate ring, the address change includes the first & the last gate in the list
+	public void onGateListAppended() {
 		gatesLock.lock();
-		for (int i = 0; i < this.gates.size(); i++) {
-			final int temp = i;
-			new Thread(() -> sendAddrChangeToGate(makeGateHttpAddressesChangeRequest(temp))).start();
+		// update the gates in the ring
+		if (gates.size() > 1) {
+			if (gates.size() == 2) {
+				// send update to two gate
+				new Thread(() -> sendAddrChangeToGate(newGateAddrChangeReqFor(0), 0)).start();
+				new Thread(() -> sendAddrChangeToGate(newGateAddrChangeReqFor(1), 1)).start();
+			} else {
+				new Thread(() -> sendAddrChangeToGate(newGateAddrChangeReqFor(gates.size() - 1), gates.size() - 1)).start();
+				new Thread(() -> sendAddrChangeToGate(newGateAddrChangeReqFor(gates.size() - 2), gates.size() - 2)).start();
+				new Thread(() -> sendAddrChangeToGate(newGateAddrChangeReqFor(0), 0)).start();
+			}
 		}
-		new Thread(() -> sendAddrChangeToParkingSpace(makeGateHttpAddressesChangeRequest(-1), this
-				.parkingSpaceHttpAddr)).start();
+
+		// tell the parking space to update the gate list
+		final ArrayList<String> gateAddrs = new ArrayList<>();
+		for (GateInfo gi : gates) {
+			gateAddrs.add(gi.httpAddress);
+		}
+		new Thread(() -> sendAddrChangeToParkingSpace(new GateHttpAddressesChangeRequest(gateAddrs), this.parkingSpaceHttpAddr)).start();
 		gatesLock.unlock();
 
 	}
 
-	// make a gate address list update request to the gate's http server
-	// IMPORTANT: Assuming the gates list lock is acquired
-	private GateHttpAddressesChangeRequest makeGateHttpAddressesChangeRequest(int index) {
-		GateHttpAddressesChangeRequest nq = new GateHttpAddressesChangeRequest();
-		nq.index = index;
-		ArrayList<String> addrs = new ArrayList<>();
-		for (GateInfo g : this.gates) {
-			addrs.add(g.httpAddress);
+	/**
+	 * make a GateHttpAddressesChangeRequest for the gate at @param index. The addresses to change to
+	 * are the adjacent left and right gates
+	 * IMPORTANT: Assuming the gates list lock is acquired
+	 **/
+	private GateHttpAddressesChangeRequest newGateAddrChangeReqFor(int index) {
+		final int len = this.gates.size();
+		if (len == 0) {
+			throw new RuntimeException("Expect a non-empty gate list");
 		}
-		nq.gateHttpAddrs = addrs;
+
+		Function<Integer, Boolean> inRange = (in) -> in >= 0 && in < len;
+		if (!inRange.apply(index)) {
+			throw new RuntimeException("Expect an address in range");
+		}
+		ArrayList<String> addrs = new ArrayList<>();
+
+		int left, right;
+		if (index == 0) {
+			left = len - 1;
+			right = index + 1;
+		} else if (index == len - 1) {
+			left = index - 1;
+			right = 0;
+		} else {
+			left = index - 1;
+			right = index + 1;
+		}
+
+		if (left == right) {
+			if (inRange.apply(left)) {
+				addrs.add(this.gates.get(left).httpAddress);
+			}
+		} else {
+			if (inRange.apply(left)) {
+				addrs.add(this.gates.get(left).httpAddress);
+			}
+			if (inRange.apply(right)) {
+				addrs.add(this.gates.get(right).httpAddress);
+			}
+		}
+
+		GateHttpAddressesChangeRequest nq = new GateHttpAddressesChangeRequest(addrs);
 		return nq;
 	}
 
@@ -234,7 +283,7 @@ public class Monitor implements Runnable {
 		} finally {
 			gatesLock.unlock();
 		}
-		new Thread(() -> propagateAddressChange()).start();
+		new Thread(() -> onGateListAppended()).start();
 		return resp;
 	}
 

@@ -53,9 +53,6 @@ public class GateAddressBook implements HttpHandler, PeerHttpAddressProvider {
         ex.sendResponseHeaders(HttpURLConnection.HTTP_OK, -1);
         ex.close();
 
-        if (req.index >= 0) { // ignore < 0 index
-            req.gateHttpAddrs.remove(req.index);
-        }
         this.setPeerHttpAddresses2(req.gateHttpAddrs);
     }
 

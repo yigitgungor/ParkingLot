@@ -3,7 +3,7 @@ package edu.rutgers.cs431.teamchen.monitor;
 import java.util.ArrayList;
 
 public interface TokenReservoir {
-    // gets the next batch of @param count token,
+    // gets the next batch of token,
     // make sure they are unique
     ArrayList<String> next() throws Exception;
 
