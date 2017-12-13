@@ -10,6 +10,7 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 
+// abstracts the communication with the parking space
 public class ParkingSpaceConnection {
     private final URL parkingSpace;
 

@@ -4,7 +4,6 @@ package edu.rutgers.cs431.teamchen.gate;
 import com.sun.net.httpserver.HttpServer;
 import edu.rutgers.cs431.TrafficGeneratorProto.Car;
 import edu.rutgers.cs431.teamchen.gate.token.DistributedTokenStore;
-import edu.rutgers.cs431.teamchen.gate.token.ForProfitTokenStore;
 import edu.rutgers.cs431.teamchen.gate.token.NoShareTokenStore;
 import edu.rutgers.cs431.teamchen.gate.token.TokenStore;
 import edu.rutgers.cs431.teamchen.proto.CarWithToken;
@@ -21,11 +20,9 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Logger;
 
 public class Gate implements Runnable {
 
-    private static final Logger logger = Logger.getLogger("Gate");
     // port to listen to cars from traffic generator
     private final int gateTcpPort;
     // port to listen to http requests
@@ -118,10 +115,7 @@ public class Gate implements Runnable {
                 this.tokenStore = new NoShareTokenStore(resp.tokens);
                 break;
             case GateRegisterResponse.STRATEGY_DISTRIBUTED:
-                this.tokenStore = new DistributedTokenStore(resp.tokens, gateAddressBook);
-                break;
-            case GateRegisterResponse.STRATEGY_FOR_PROFIT:
-                this.tokenStore = new ForProfitTokenStore(resp.tokens, gateAddressBook);
+                this.tokenStore = new DistributedTokenStore(resp.tokens, gateAddressBook, this.httpServer);
                 break;
         }
     }

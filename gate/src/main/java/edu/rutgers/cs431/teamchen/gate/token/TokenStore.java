@@ -1,7 +1,7 @@
 package edu.rutgers.cs431.teamchen.gate.token;
 
 public interface TokenStore {
-    // returns a token, if there is no token then wait indefinitely
+    // returns a token, if there is no token then synchronously wait
     // until there is one
     String getToken() throws InterruptedException;
 

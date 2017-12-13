@@ -25,10 +25,8 @@ public class Main {
                 return GateRegisterResponse.STRATEGY_NO_SHARED;
             case 2:
                 return GateRegisterResponse.STRATEGY_DISTRIBUTED;
-            case 3:
-                return GateRegisterResponse.STRATEGY_FOR_PROFIT;
             default:
-                System.err.println("strategy not recognizable: please pick 1, 2, or 3.");
+                System.err.println("strategy not recognizable: please pick 1, or 2.");
                 System.exit(1);
         }
         return 0;

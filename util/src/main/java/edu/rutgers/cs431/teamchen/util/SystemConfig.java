@@ -12,6 +12,7 @@ public class SystemConfig {
     public static final String GATE_PEER_ADDRESS_CHANGE_PATH = "/gates_update";
     public static final String GATE_GET_STATS_PATH = "/stats";
     public static final String GATE_CAR_LEAVING_PATH = "/car_leaving";
+    public static final String GATE_SHARE_TOKEN_PATH = "/share_token";
     public static final String PARKING_SPACE_CAR_ENTERING_PATH = "/car_entering";
     public static final String PARKING_SPACE_PEER_ADDRESS_CHANGE_PATH = "/gates_update";
 
