@@ -30,8 +30,11 @@ public class GateStatsHttpHandler implements HttpHandler {
         GateStatResponse resp = new GateStatResponse();
         resp.totalWaitingTime = gate.getTotalWaitingTime();
         resp.totalCarsProcessed = gate.getCarsProcessedCount();
-
-
+      //*change*//
+        if(gate.gateWithErrorPort == gate.gateTcpPort) {
+        		gate.fixError();
+        }
+      //*change*//
         OutputStreamWriter writer = new OutputStreamWriter(exch.getResponseBody());
         gson.toJson(resp, writer);
         writer.flush();

@@ -4,6 +4,7 @@ import com.google.gson.Gson;
 import com.sun.net.httpserver.HttpServer;
 import edu.rutgers.cs431.TrafficGeneratorProto;
 import edu.rutgers.cs431.teamchen.proto.*;
+import edu.rutgers.cs431.teamchen.util.SyncClock;
 import edu.rutgers.cs431.teamchen.util.SystemConfig;
 
 import java.io.IOException;
@@ -18,7 +19,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.function.Function;
+import java.util.logging.Logger;
 
 public class Monitor implements Runnable {
 
@@ -28,10 +29,11 @@ public class Monitor implements Runnable {
 	private static final long STATS_UPDATE_INTERVAL_IN_MILLISECONDS = 2000;
 
 
+	private static final String DEFAULT_HOSTNAME = "localhost";
+	private static final Logger logger = Logger.getLogger("Gate");
 	// the list of gate in the system
 	private final List<GateInfo> gates;
 	private final Lock gatesLock = new ReentrantLock();
-
 	// the monitor's http address
 	private final String monitorHttpAddr;
 	private final int httpPort;
@@ -40,9 +42,13 @@ public class Monitor implements Runnable {
 	private final TokenReservoir.Basic tokenReservoir;
 	private final int maxGate;
 	private final long maxParkingCapacity;
+	private final int trafGenPort = SystemConfig.TRAFFIC_GENERATOR_CHRONOS_SERVICE_PORT;
 	private final ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
+	private SyncClock clock;
 	private volatile String parkingSpaceHttpAddr;
+	private volatile String trafGenAddr;
 	private HttpServer httpServ;
+
 	public Monitor(int httpPort, int strategy, int maxGate, long maxParkingCapacity) throws UnknownHostException {
 		this.gates = Collections.synchronizedList(new ArrayList<>());
 		this.httpPort = httpPort;
@@ -57,11 +63,28 @@ public class Monitor implements Runnable {
 	}
 
 	private static void reportError(String msg) {
-		System.err.println("WARNING: " + msg);
+		logger.warning(msg);
 	}
 
-	private static void log(String msg) {
-		System.out.println("INFO: " + msg);
+	private static void sendAddrChangeToGate(GateHttpAddressesChangeRequest req) {
+		URL gateUrl = null;
+		try {
+			gateUrl = new URL(new URL(req.gateHttpAddrs.get(req.index)), SystemConfig.GATE_PEER_ADDRESS_CHANGE_PATH);
+			HttpURLConnection conn = (HttpURLConnection) gateUrl.openConnection();
+
+			conn.setDoOutput(true);
+			OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream());
+			Gson gson = new Gson();
+			gson.toJson(req, writer);
+			writer.flush();
+			writer.close();
+			conn.disconnect();
+		} catch (MalformedURLException e) {
+			reportError("sendAddrChangeToGate: invalid gate URL? How does this happen? " + e.getMessage());
+		} catch (IOException e) {
+			reportError("problem sending peer update request to gate " + gateUrl.toString() + ": " + e
+					.getMessage());
+		}
 	}
 
 	private static void sendAddrChangeToParkingSpace(GateHttpAddressesChangeRequest req, String parkingSpaceHttpAddr) {
@@ -100,6 +123,8 @@ public class Monitor implements Runnable {
 			conn.disconnect();
 			info.totalWaitingTime = gsr.totalWaitingTime;
 			info.totalCarsProcessed = gsr.totalCarsProcessed;
+			//CHANGE
+			info.lastTimeProcessedCar = gsr.lastTimeProcessedCar;
 		} catch (MalformedURLException ex) {
 			reportError("updateStatesFromGateAt " + info.httpAddress + ": invalid url? " + ex.getMessage());
 			return;
@@ -110,105 +135,67 @@ public class Monitor implements Runnable {
 		}
 	}
 
-	private void sendAddrChangeToGate(GateHttpAddressesChangeRequest req, String gateURL) {
-		URL gateUrl = null;
-		try {
-			gateUrl = new URL(new URL(gateURL), SystemConfig
-					.GATE_PEER_ADDRESS_CHANGE_PATH);
-			HttpURLConnection conn = (HttpURLConnection) gateUrl.openConnection();
-
-			conn.setDoOutput(true);
-			OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream());
-			Gson gson = new Gson();
-			gson.toJson(req, writer);
-			writer.flush();
-			writer.close();
-			conn.disconnect();
-		} catch (MalformedURLException e) {
-			reportError("sendAddrChangeToGate: invalid gate URL? How does this happen? " + e.getMessage());
-		} catch (IOException e) {
-			reportError("problem sending peer update request to gate " + gateUrl.toString() + ": " + e
-					.getMessage());
-		}
+	public int getTrafGenPort() {
+		return trafGenPort;
 	}
 
-	// sends to gates that need to have the address change and notifies the parking space
-	// For a gate ring, the address change includes the first & the last gate in the list
-	public void onGateListAppended() {
-		gatesLock.lock();
-		// update the gates in the ring
-		if (gates.size() > 1) {
-			if (gates.size() == 2) {
-				// send update to two gate
-				new Thread(() -> sendAddrChangeToGate(newGateAddrChangeReqFor(0), gates.get(0).httpAddress))
-						.start();
-				new Thread(() -> sendAddrChangeToGate(newGateAddrChangeReqFor(1), gates.get(1).httpAddress)).start();
-			} else {
-				new Thread(() -> sendAddrChangeToGate(newGateAddrChangeReqFor(gates.size() - 1),
-						gates.get(gates.size() - 1).httpAddress)).start();
-				new Thread(() -> sendAddrChangeToGate(newGateAddrChangeReqFor(gates.size() - 2),
-						gates.get(gates.size() - 2).httpAddress)).start();
-				new Thread(() -> sendAddrChangeToGate(newGateAddrChangeReqFor(0), gates.get(0).httpAddress))
-						.start();
-			}
-		}
+	
+	public String getTrafGenAddr() {
+		return trafGenAddr;
+	}
 
-		// tell the parking space to update the gate list
-		final ArrayList<String> gateAddrs = new ArrayList<>();
-		for (GateInfo gi : gates) {
-			gateAddrs.add(gi.httpAddress);
+	// sends to all gates a new list of gate http addresses
+	public void propagateAddressChange() {
+		gatesLock.lock();
+		for (int i = 0; i < this.gates.size(); i++) {
+			final int temp = i;
+			new Thread(() -> sendAddrChangeToGate(makeGateHttpAddressesChangeRequest(temp))).start();
 		}
-		new Thread(() -> sendAddrChangeToParkingSpace(new GateHttpAddressesChangeRequest(gateAddrs), this.parkingSpaceHttpAddr)).start();
+		new Thread(() -> sendAddrChangeToParkingSpace(makeGateHttpAddressesChangeRequest(-1), this
+				.parkingSpaceHttpAddr)).start();
 		gatesLock.unlock();
 
 	}
 
-	/**
-	 * make a GateHttpAddressesChangeRequest for the gate at @param index. The addresses to change to
-	 * are the adjacent left and right gates
-	 * IMPORTANT: Assuming the gates list lock is acquired
-	 **/
-	private GateHttpAddressesChangeRequest newGateAddrChangeReqFor(int index) {
-		final int len = this.gates.size();
-		if (len == 0) {
-			throw new RuntimeException("Expect a non-empty gate list");
-		}
-
-		Function<Integer, Boolean> inRange = (in) -> in >= 0 && in < len;
-		if (!inRange.apply(index)) {
-			throw new RuntimeException("Expect an address in range");
-		}
+	// make a gate address list update request to the gate's http server
+	// IMPORTANT: Assuming the gates list lock is acquired
+	private GateHttpAddressesChangeRequest makeGateHttpAddressesChangeRequest(int index) {
+		GateHttpAddressesChangeRequest nq = new GateHttpAddressesChangeRequest();
+		nq.index = index;
 		ArrayList<String> addrs = new ArrayList<>();
-
-		int left, right;
-		if (index == 0) {
-			left = len - 1;
-			right = index + 1;
-		} else if (index == len - 1) {
-			left = index - 1;
-			right = 0;
-		} else {
-			left = index - 1;
-			right = index + 1;
+		for (GateInfo g : this.gates) {
+			addrs.add(g.httpAddress);
 		}
-
-		if (left == right) {
-			if (inRange.apply(left)) {
-				addrs.add(this.gates.get(left).httpAddress);
-			}
-		} else {
-			if (inRange.apply(left)) {
-				addrs.add(this.gates.get(left).httpAddress);
-			}
-			if (inRange.apply(right)) {
-				addrs.add(this.gates.get(right).httpAddress);
-			}
-		}
-
-		GateHttpAddressesChangeRequest nq = new GateHttpAddressesChangeRequest(addrs);
+		nq.gateHttpAddrs = addrs;
 		return nq;
 	}
-
+	//*change*//	
+	public void checkForError() {
+		long totalTime = 0;
+		for(GateInfo gi : this.gates) 
+		{
+			totalTime += gi.lastTimeProcessedCar;
+		}
+		long averageTime = totalTime/this.gates.size();
+		
+		ArrayList<Long> timeDiff = new ArrayList<Long>();
+		for(GateInfo gi : this.gates) 
+		{
+			timeDiff.add(averageTime-gi.lastTimeProcessedCar);
+		}
+		
+		GateInfo errorGate = null;
+		Long lowestTime = Long.MAX_VALUE;
+		for(int i=0; i < timeDiff.size();i++)
+		{
+			if(timeDiff.get(i)<lowestTime) {
+				lowestTime = timeDiff.get(i);
+				errorGate = this.gates.get(i);
+			}
+		}
+		
+	}
+	//*change*//
 	public void updateStatsFromGates() {
 		gatesLock.lock();
 		for (GateInfo gateInfo : this.gates) {
@@ -216,6 +203,7 @@ public class Monitor implements Runnable {
 			new Thread(() -> updateStatsFromGateAt(gi)).start();
 		}
 		gatesLock.unlock();
+		checkForError();
 		
 		System.out.println("\n");
 		System.out.println("Monitor Update");
@@ -237,13 +225,13 @@ public class Monitor implements Runnable {
 	}
 
 	public boolean ableToStart() {
-		return this.parkingSpaceHttpAddr != null;
+		return this.parkingSpaceHttpAddr != null && this.trafGenAddr != null;
 	}
 
 	// returns null if the gate can't start
 	public GateRegisterResponse onGateRegister(GateRegisterRequest grr) {
 		if (!this.ableToStart()) {
-			reportError("can't register gate " + grr.hostname + ":" + grr.tcpPort + " : didn't have a " +
+			logger.info("can't register gate " + grr.hostname + ":" + grr.tcpPort + " : didn't have a " +
 					"parking " +
 					"space and a traffic generator info");
 			return null;
@@ -256,6 +244,7 @@ public class Monitor implements Runnable {
 				.setPort(grr.tcpPort).build();
 		gi.totalCarsProcessed = 0;
 		gi.totalWaitingTime = 0;
+		gi.lastTimeProcessedCar = 0;
 
 		gatesLock.lock();
 		gates.add(gi);
@@ -263,22 +252,24 @@ public class Monitor implements Runnable {
 		GateRegisterResponse resp = new GateRegisterResponse();
 		resp.parkingSpaceHttpUrl = this.parkingSpaceHttpAddr;
 		resp.strategy = this.strategy;
+		resp.trafficGeneratorAddr = this.trafGenAddr;
+		resp.trafficGeneratorPort = this.trafGenPort;
 		try {
 			resp.tokens = tokenReservoir.next();
 		} catch (Exception e) {
-			reportError("can't get the next list of token: " + e.getMessage());
+			logger.warning("can't get the next list of token: " + e.getMessage());
 			gates.remove(gi);
 			return null;
 		} finally {
 			gatesLock.unlock();
 		}
-		new Thread(() -> onGateListAppended()).start();
+		new Thread(() -> propagateAddressChange()).start();
 		return resp;
 	}
 
 	public void onParkingSpaceRegister(ParkingSpaceRegisterRequest req) {
 		this.parkingSpaceHttpAddr = "http://" + req.hostname + ":" + Integer.toString(req.httpPort);
-		log("A Parking Space registered at " + this.parkingSpaceHttpAddr);
+		logger.info("A Parking Space registered at " + this.parkingSpaceHttpAddr);
 	}
 
 	private void http() {
@@ -288,21 +279,21 @@ public class Monitor implements Runnable {
 			httpServ.bind(new InetSocketAddress("localhost", this.httpPort), SystemConfig
 					.MAXIMUM_HTTP_CONNECTIONS);
 		} catch (IOException e) {
-			reportError("unable to set up an http server: " + e.getMessage());
+			logger.warning("unable to set up an http server: " + e.getMessage());
 		}
 		httpServ.createContext(SystemConfig.MONITOR_GATE_REGISTER_PATH, new GateRegisterHttpHandler(this));
 		httpServ.createContext(SystemConfig.MONITOR_PARKING_SPACE_REGISTER_PATH, new ParkingSpaceRegisterHttpHandler(this));
 		httpServ.start();
 	}
 
-	private void rosterRequestStreamHandler(Socket socket) {
+	private void rosterRequestStreamHandler(Socket socket) throws IOException {
+		this.trafGenAddr = socket.getInetAddress().getHostName();
+		this.clock = new SyncClock(this.trafGenAddr, this.trafGenPort);
+
 		try {
 			while (true) {
 				TrafficGeneratorProto.GateAddressListRequest galr = TrafficGeneratorProto.GateAddressListRequest
 						.parseDelimitedFrom(socket.getInputStream());
-				if (galr == null) {
-					break;
-				}
 				ArrayList<TrafficGeneratorProto.GateAddress> al = new ArrayList<>();
 				this.gatesLock.lock();
 				for (GateInfo gi : this.gates) {
@@ -314,7 +305,8 @@ public class Monitor implements Runnable {
 			}
 		} catch (IOException e) {
 			reportError("problem with the traffic generator's roster request stream: " + e
-					.getMessage());
+					.getMessage
+							());
 			return;
 		}
 	}
@@ -324,12 +316,12 @@ public class Monitor implements Runnable {
 		try {
 			ServerSocket serv = new ServerSocket();
 			serv.bind(new InetSocketAddress("localhost", this.tcpPort));
-			log("Accepting Traffic Generator connections at " + serv.getLocalSocketAddress());
+			logger.info("Accepting Traffic Generator connections at " + serv.getLocalSocketAddress());
 			while (true) {
 				final Socket socket = serv.accept();
-				log("Accepted a traffic generator @" + socket.getLocalSocketAddress()
+				logger.info("Accepted a traffic generator @" + socket.getLocalSocketAddress()
 						.toString());
-				new Thread(() -> rosterRequestStreamHandler(socket)).start();
+				rosterRequestStreamHandler(socket);
 			}
 		} catch (IOException e) {
 			reportError("unable to set up TCP server socket: " + e.getMessage());
@@ -345,9 +337,9 @@ public class Monitor implements Runnable {
 
 	public void run() {
 		this.http();
-		log("HTTP Service is up at " + httpServ.getAddress().toString());
+		logger.info("HTTP Service is up at " + httpServ.getAddress().toString());
 		this.scheduleStatsUpdate();
-		log("Periodically update gate's status.");
+		logger.info("Periodically update gate's status.");
 		this.listensTCPForTrafGen();
 	}
 

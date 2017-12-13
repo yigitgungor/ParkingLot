@@ -11,10 +11,7 @@
     </parent>
 
     <!-- project coordinates -->
-    <groupId>edu.rutgers.cs431.teamchen</groupId>
     <artifactId>monitor</artifactId>
-    <version>1.0</version>
-
     <!-- project dependencies -->
     <dependencies>
         <dependency>
