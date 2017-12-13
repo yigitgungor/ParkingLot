@@ -29,8 +29,6 @@ public class ParkingSpaceRegisterHttpHandler implements HttpHandler {
 
 
         ParkingSpaceRegisterResponse resp = new ParkingSpaceRegisterResponse();
-        resp.trafGenAddr = mon.getTrafGenAddr();
-        resp.trafGenPort = mon.getTrafGenPort();
         OutputStreamWriter writer = new OutputStreamWriter(ex.getResponseBody());
         gson.toJson(resp, writer);
         writer.flush();

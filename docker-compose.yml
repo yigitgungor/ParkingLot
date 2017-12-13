@@ -1,0 +1,53 @@
+version: '3'
+services:
+  monitor:
+    image: java:8
+    volumes:
+      - ./bin:/bin
+    command: java -jar /bin/monitor.jar 8080 2 6 200
+
+  trafficgenerator:
+    image: java:8
+    volumes:
+      - ./bin:/bin
+    depends_on:
+      - monitor
+    command: java -jar /bin/traffic.jar monitor
+
+  parkingspace:
+    image: java:8
+    volumes:
+      - ./bin:/bin
+    depends_on:
+      - monitor
+    command: java -jar /bin/parkspc.jar http://monitor:8080/ 1234
+
+  gate1:
+    image: java:8
+    volumes:
+      - ./bin:/bin
+    depends_on:
+      - monitor
+      - trafficgenerator
+      - parkingspace
+    command: java -jar /bin/gate.jar http://monitor:8080/ 8001 9001 6000
+
+  gate2:
+      image: java:8
+      volumes:
+        - ./bin:/bin
+      depends_on:
+        - monitor
+        - trafficgenerator
+        - parkingspace
+      command: java -jar /bin/gate.jar http://monitor:8080/ 8001 9001 6000
+
+  gate3:
+      image: java:8
+      volumes:
+        - ./bin:/bin
+      depends_on:
+        - monitor
+        - trafficgenerator
+        - parkingspace
+      command: java -jar /bin/gate.jar http://monitor:8080/ 8001 9001 6000
