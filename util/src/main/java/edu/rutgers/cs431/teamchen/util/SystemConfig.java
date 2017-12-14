@@ -3,8 +3,6 @@ package edu.rutgers.cs431.teamchen.util;
 // all system level configuration variables
 public class SystemConfig {
     public static final int MONITOR_ROSTER_PROTOBUF_SERVICE_PORT = 6666;
-    public static final int TRAFFIC_GENERATOR_CHRONOS_SERVICE_PORT = 5555;
-
 
     // HTTP Path config
     public static final String MONITOR_PARKING_SPACE_REGISTER_PATH = "/parking_register";

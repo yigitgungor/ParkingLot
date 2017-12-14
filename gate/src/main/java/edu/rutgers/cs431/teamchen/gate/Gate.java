@@ -9,6 +9,7 @@ import edu.rutgers.cs431.teamchen.gate.token.TokenStore;
 import edu.rutgers.cs431.teamchen.proto.CarWithToken;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterRequest;
 import edu.rutgers.cs431.teamchen.proto.GateRegisterResponse;
+import edu.rutgers.cs431.teamchen.util.DataFormatter;
 import edu.rutgers.cs431.teamchen.util.GateAddressBook;
 import edu.rutgers.cs431.teamchen.util.SyncClock;
 import edu.rutgers.cs431.teamchen.util.SystemConfig;
@@ -43,11 +44,21 @@ public class Gate implements Runnable {
     private HttpServer httpServer;
     private ServerSocket carsAcceptor;
 
-    public Gate(String monitorHttpAddr, int gatePort, int httpPort, long tranferDuration) {
+    public Gate(String monitorHttpAddr, int gatePort, int httpPort, long tranferDuration, String trafGenAddr, int
+            trafGenPort) {
         this.waitingQueue = new ConcurrentLinkedQueue<CarArrival>();
         this.gateTcpPort = gatePort;
         this.gateHttpPort = httpPort;
         this.transferDuration = tranferDuration;
+
+        // set up the time service
+        try {
+            this.clock = new SyncClock(trafGenAddr, trafGenPort);
+        } catch (IOException e) {
+            reportError("unable to set up clock synchronization: " + e.getMessage());
+            System.exit(1);
+        }
+
         MonitorConnection mc = null;
         try {
             mc = new MonitorConnection(monitorHttpAddr);
@@ -59,7 +70,7 @@ public class Gate implements Runnable {
     }
 
     private static void reportError(String msg) {
-        System.out.println("WARNING: " + msg);
+        System.err.println("WARNING: " + msg);
     }
 
     private static void log(String msg) {
@@ -95,18 +106,11 @@ public class Gate implements Runnable {
             System.exit(1);
         }
 
-        // set up the time service
-        try {
-            this.clock = new SyncClock(resp.trafficGeneratorAddr, resp.trafficGeneratorPort);
-        } catch (IOException e) {
-            reportError("unable to set up clock synchronization: " + e.getMessage());
-            System.exit(1);
-        }
-
         try {
             this.parkingSpaceConn = new ParkingSpaceConnection(resp.parkingSpaceHttpUrl);
         } catch (IOException e) {
             reportError("invalid Parking Space's HTTP URL: " + resp.parkingSpaceHttpUrl + ": " + e.getMessage());
+            System.exit(1);
         }
 
         // set up the token distribution strategy
@@ -139,7 +143,7 @@ public class Gate implements Runnable {
     // initiates a thread that listens to traffic generator(s?)
     public void tcpListensToTrafficGens() {
         // Creates a car accepting socket
-        log("starting to accept cars from traffic generator...");
+        log("Starting to accept cars from traffic generator...");
 
         try {
             this.carsAcceptor = new ServerSocket();
@@ -156,17 +160,25 @@ public class Gate implements Runnable {
     // a traffic generator
     private void acceptsGeneratorCarStreams(ServerSocket gateSocket) {
         final Gate gate = this;
-
+        Socket carStream = null;
         while (true) {
             try {
-                Socket carStream = gateSocket.accept();
-                log("Accepts a car stream from " + carStream.getLocalSocketAddress().toString());
-                // handles the car stream on a thread for each new traffic generator
-                new Thread(gate.makeCarStreamHandler(carStream)).start();
-
+                carStream = gateSocket.accept();
+                Car car = Car.parseDelimitedFrom(carStream.getInputStream());
+                if (car == null) {
+                    return; // no longer be able to receive car from this socket
+                }
+                log("(TrafficGenerator->Gate): " + DataFormatter.format(car));
+                gate.queueIn(car);
             } catch (Exception e) {
                 reportError("Problem accepting a new car stream: " + e.getMessage());
                 break;
+            } finally {
+                try {
+                    carStream.close();
+                } catch (IOException e) {
+                    reportError("Problem closing traffic generator socket: " + e.getMessage());
+                }
             }
         }
         try {
@@ -176,28 +188,8 @@ public class Gate implements Runnable {
         }
     }
 
-    // returns a thread that handles incoming car stream
-    private Runnable makeCarStreamHandler(Socket incomingCarSocket) {
-        final Gate gate = this;
-        return () -> {
-                try {
-                    while (true) {
-                        Car car = Car.parseDelimitedFrom(incomingCarSocket.getInputStream());
-                        if (car == null) {
-                            return; // no longer be able to receive car from this socket
-                        }
-                        log("Car entering from the traffic generator: " + car);
-                        gate.queueIn(car);
-                    }
-                } catch (IOException e) {
-                    reportError("cannot receive car from traffic generator: " + e.getMessage());
-                }
-
-        };
-    }
-
     public void onCarLeaving(CarWithToken cwt) {
-        log("Leaving Car and Returning Token " + cwt.token);
+        log("(Gate -> __Traffic__) " + DataFormatter.format(cwt));
         this.tokenStore.addToken(cwt.token);
     }
 
@@ -247,10 +239,10 @@ public class Gate implements Runnable {
         }
         try {
             this.parkingSpaceConn.sendCarToParkingSpace(cwt);
-            log("Car Entering the Parking Space with Token " + cwt.token);
+            log("(Gate->ParkingSpace) " + DataFormatter.format(cwt));
         } catch (IOException e) {
             reportError("unable to send car with token " + cwt.token + " to the parking space: " + e.getMessage());
-            log("returning token " + cwt.token + " back to the storage");
+            log("Returning token " + cwt.token + " back to the storage");
             this.tokenStore.addToken(cwt.token);
         }
     }

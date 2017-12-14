@@ -36,5 +36,7 @@ public class GateStatsHttpHandler implements HttpHandler {
         gson.toJson(resp, writer);
         writer.flush();
         writer.close();
+
+        exch.close();
     }
 }

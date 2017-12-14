@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpServer;
 import edu.rutgers.cs431.teamchen.proto.CarWithToken;
 import edu.rutgers.cs431.teamchen.proto.ParkingSpaceRegisterRequest;
 import edu.rutgers.cs431.teamchen.proto.ParkingSpaceRegisterResponse;
+import edu.rutgers.cs431.teamchen.util.DataFormatter;
 import edu.rutgers.cs431.teamchen.util.GateAddressBook;
 import edu.rutgers.cs431.teamchen.util.SyncClock;
 import edu.rutgers.cs431.teamchen.util.SystemConfig;
@@ -20,10 +21,8 @@ import java.util.Random;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.logging.Logger;
 
 public class ParkingSpace implements Runnable {
-    private static final Logger logger = Logger.getLogger("parking-space");
     private final int httpPort;
     private final URL monitorAddr;
     private final GateAddressBook gateAddressBook = new GateAddressBook();
@@ -33,18 +32,22 @@ public class ParkingSpace implements Runnable {
     private Lock parkedQLock = new ReentrantLock();
     private Condition notEmpty = parkedQLock.newCondition();
 
-
-    public ParkingSpace(String monitorAddress, int httpPort) throws MalformedURLException {
+    public ParkingSpace(String monitorAddress, int httpPort, String trafGenAddr, int trafGenPort) throws IOException {
         this.httpPort = httpPort;
         this.monitorAddr = new URL(monitorAddress);
+        this.clock = new SyncClock(trafGenAddr, trafGenPort);
     }
 
-    private static void reportError(String mess) {
-        logger.warning(mess);
+    private static void reportError(String msg) {
+        System.out.println("WARNING: " + msg);
+    }
+
+    private static void log(String msg) {
+        System.out.println("INFO: " + msg);
     }
 
     public void onCarEntering(CarWithToken cwt) {
-        logger.info("Incoming car with token " + cwt.token);
+        log("(Gate->ParkingSpace) " + DataFormatter.format(cwt));
         this.letCarPark(cwt);
     }
 
@@ -60,23 +63,27 @@ public class ParkingSpace implements Runnable {
         ArrayList<URL> gates = this.gateAddressBook.getAddresses();
         // Pick a random gate
         Random r = new Random(this.clock.getTime());
+
         URL gate = gates.get(r.nextInt(gates.size()));
         try {
-            HttpURLConnection conn = (HttpURLConnection) gate.openConnection();
-            OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream());
             Gson gson = new Gson();
+            HttpURLConnection conn = (HttpURLConnection) new URL(gate, SystemConfig.GATE_CAR_LEAVING_PATH)
+                    .openConnection();
+            conn.setDoOutput(true);
+            OutputStreamWriter writer = new OutputStreamWriter(conn.getOutputStream());
             gson.toJson(cwt, writer);
             writer.flush();
             writer.close();
+
+            if (conn.getResponseCode() != 200) {
+                reportError("can't send car back to gate: status not OK");
+            }
+
+            log("(ParkingSpace->Gate) " + DataFormatter.format(cwt));
             conn.disconnect();
         } catch (IOException e) {
-            reportError("can't send car through gate " + gate.toString());
-            reportError("retry"); // because I don't wanna lose any tokens!
-            onCarDepart(cwt);
-            return;
+            reportError("can't send car through gate " + gate.toString() + " " + e.getMessage());
         }
-
-        logger.info("Car leaving through gate +" + gate.toString() + "+ with token " + cwt.token + "");
     }
 
     // gets the earliest car out of the queue to look down on...
@@ -89,7 +96,7 @@ public class ParkingSpace implements Runnable {
             CarWithToken early = this.parkedQ.remove();
             return early;
         } catch (InterruptedException e) {
-            // TODO: Do what?
+
         } finally {
             parkedQLock.unlock();
         }
@@ -133,8 +140,6 @@ public class ParkingSpace implements Runnable {
         ParkingSpaceRegisterResponse resp = gson.fromJson(reader, ParkingSpaceRegisterResponse.class);
         reader.close();
         conn.disconnect();
-        
-        this.clock = new SyncClock(resp.trafGenAddr, resp.trafGenPort);
     }
 
     public void http() {
@@ -153,10 +158,10 @@ public class ParkingSpace implements Runnable {
 
     public void run() {
         this.http();
-        logger.info("HTTP Service is up at " + this.httpServer.getAddress().toString());
+        log("HTTP Service is up at " + this.httpServer.getAddress().toString());
         try {
             this.registersWithMonitor();
-            logger.info("Parking Space Registered.");
+            log("Parking Space Registered.");
         } catch (IOException e) {
             reportError(e.getMessage());
             System.exit(1);

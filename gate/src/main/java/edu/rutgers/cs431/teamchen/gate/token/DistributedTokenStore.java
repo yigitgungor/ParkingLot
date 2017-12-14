@@ -23,6 +23,7 @@ import java.util.concurrent.locks.ReentrantLock;
 //
 // Implements strategy 2
 public class DistributedTokenStore implements TokenStore, HttpHandler {
+
     private final Lock lock = new ReentrantLock();
     private final Condition notEmpty = lock.newCondition();
     private final PeerHttpAddressProvider addressProvider;
@@ -46,6 +47,10 @@ public class DistributedTokenStore implements TokenStore, HttpHandler {
         writer.flush();
         writer.close();
 
+        if (conn.getResponseCode() != 200) {
+            throw new IOException("can't get token");
+        }
+
         // receives a token response
         InputStreamReader reader = new InputStreamReader(conn.getInputStream());
         ShareTokenResponse resp = gson.fromJson(reader, ShareTokenResponse.class);
@@ -57,7 +62,9 @@ public class DistributedTokenStore implements TokenStore, HttpHandler {
     public void addToken(String token) {
         lock.lock();
         tokens.add(token);
-        notEmpty.notify();
+        synchronized (notEmpty) {
+            notEmpty.notify();
+        }
         lock.unlock();
     }
 
@@ -74,7 +81,7 @@ public class DistributedTokenStore implements TokenStore, HttpHandler {
         // Get the token
         String sharedToken = null;
         lock.lock();
-        if (this.tokens.size() == 0) {
+        if (this.tokens.size() != 0) {
             sharedToken = this.tokens.get(0);
             this.tokens.remove(0);
         }
@@ -90,6 +97,8 @@ public class DistributedTokenStore implements TokenStore, HttpHandler {
         gson.toJson(resp, writer);
         writer.flush();
         writer.close();
+
+        ex.close();
     }
 
     // request the peers for a token, this might not return a token from the peers
@@ -103,6 +112,7 @@ public class DistributedTokenStore implements TokenStore, HttpHandler {
                         .getMessage());
             }
             if (token != null) { // has received a token from one peer, add it to the pool
+                System.out.println("Received token " + token + " from gate " + addr);
                 this.addToken(token);
                 break;
             }

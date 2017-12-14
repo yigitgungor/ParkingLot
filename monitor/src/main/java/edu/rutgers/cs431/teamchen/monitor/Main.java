@@ -1,18 +1,58 @@
 package edu.rutgers.cs431.teamchen.monitor;
 
 import edu.rutgers.cs431.teamchen.proto.GateRegisterResponse;
+import org.apache.commons.cli.*;
 
 import java.net.UnknownHostException;
 
 public class Main {
 
     public static void main(String[] args) {
-        int httpPort = Integer.parseInt(args[0]);
-        int strategy = interpretStrategy(Integer.parseInt(args[1]));
-        int maxGate = Integer.parseInt(args[2]);
-        long maxParkingCap = Long.parseLong(args[3]);
+
+        Options options = new Options();
+        options.addOption("http", "monitor-http", true, "The port number to serve the http service. Default: 8080");
+        options.addOption("s", "strategy", true, "The strategy to distribute tokens within the system. 1 for no " +
+                "token sharing between gates, and 2 for sharing tokens. Default: 2");
+        options.addOption("maxg", "max-gates", true, "The maximum number of gates. Default: 6 ");
+        options.addOption("pc", "parking-cap", true, "The parking capacity of the parking lot. Default: 200");
+        options.addOption("h", "help", false, "Print this help message");
+
+        CommandLine cmd = null;
         try {
-            new Monitor(httpPort, strategy, maxGate, maxParkingCap).run();
+            cmd = new DefaultParser().parse(options, args);
+
+        } catch (ParseException e) {
+            System.err.println("invalid arguments: " + e.toString());
+            System.exit(1);
+        }
+        if (cmd.hasOption("h")) {
+            new HelpFormatter().printHelp("monitor", options);
+            System.exit(0);
+        }
+
+        int httpPort = 8080;
+        int strategy = 2;
+        int maxGate = 6;
+        long maxParkingCap = 200;
+
+        if (cmd.hasOption("http")) {
+            httpPort = Integer.parseInt(cmd.getOptionValue("http"));
+        }
+
+        if (cmd.hasOption("s")) {
+            strategy = Integer.parseInt(cmd.getOptionValue("s"));
+        }
+
+        if (cmd.hasOption("maxg")) {
+            maxGate = Integer.parseInt(cmd.getOptionValue("maxg"));
+        }
+
+        if (cmd.hasOption("pc")) {
+            maxParkingCap = Long.parseLong(cmd.getOptionValue("pc"));
+        }
+
+        try {
+            new Monitor(httpPort, interpretStrategy(strategy), maxGate, maxParkingCap).run();
         } catch (UnknownHostException e) {
             System.err.println("can't get hostname: " + e.getMessage());
             System.exit(1);

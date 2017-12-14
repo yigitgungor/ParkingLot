@@ -28,6 +28,6 @@ public class CarEnteringHttpHandler implements HttpHandler {
         // close the http connection
         ex.close();
         // process this car
-        new Thread(() -> this.ps.onCarEntering(cwt)).start();
+        this.ps.onCarEntering(cwt);
     }
 }

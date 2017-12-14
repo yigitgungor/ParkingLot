@@ -25,8 +25,11 @@ public class CarLeavingHttpHandler implements HttpHandler {
 
         // process this car
         new Thread(() -> this.gate.onCarLeaving(cwt)).start();
-
+        ex.sendResponseHeaders(200, -1);
+        ex.getResponseBody().close();
         // close the http connection
         ex.close();
+
+
     }
 }

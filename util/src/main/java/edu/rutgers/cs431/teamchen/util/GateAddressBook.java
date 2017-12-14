@@ -19,11 +19,15 @@ import java.util.concurrent.locks.ReentrantLock;
 public class GateAddressBook implements HttpHandler, PeerHttpAddressProvider {
 
     private final Lock peerHttpAddrsLock = new ReentrantLock();
-    private ArrayList<URL> peerHttpAddrs;
+    private ArrayList<URL> peerHttpAddrs = null;
 
     public void setPeerHttpAddresses(ArrayList<URL> peerAddrs) {
         peerHttpAddrsLock.lock();
         this.peerHttpAddrs = peerAddrs;
+        System.out.println("PEER ADDRESS UPDATED: ");
+        for (URL addr : peerAddrs) {
+            System.out.println("\t" + addr);
+        }
         peerHttpAddrsLock.unlock();
     }
 

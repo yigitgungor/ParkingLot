@@ -7,9 +7,6 @@ public class GateRegisterResponse {
     public static final int STRATEGY_DISTRIBUTED = 1;
     public int strategy;
 
-    public String trafficGeneratorAddr;
-    public int trafficGeneratorPort;
-
     public String parkingSpaceHttpUrl;
 
     // The list of initial tokens provided to this gate

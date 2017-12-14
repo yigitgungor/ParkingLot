@@ -46,7 +46,7 @@ public class MonitorConnection {
             reader.close();
             conn.disconnect();
         } else {
-            throw new RuntimeException("problem processing a register request: code is not HTTP_OK");
+            throw new RuntimeException("cannot register gate: code is not HTTP_OK");
         }
 
         return grr;

@@ -35,6 +35,12 @@ public class ParkingSpaceConnection {
 
         writer.flush();
         writer.close();
+
+        int code = conn.getResponseCode();
+        if (code != HttpURLConnection.HTTP_OK) {
+            throw new IOException("send car to parking space: code is not OK.");
+        }
+
         conn.disconnect();
     }
 
