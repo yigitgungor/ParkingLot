@@ -65,6 +65,7 @@ public class Gate implements Runnable {
     this.gateTcpPort = gatePort;
     this.gateHttpPort = httpPort;
     this.transferDuration = tranferDuration;
+    this.lastTimeProcessedCar = this.clock.getTime();
     MonitorConnection mc = null;
     try {
       mc = new MonitorConnection(monitorHttpAddr);
