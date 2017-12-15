@@ -24,8 +24,9 @@ import java.util.concurrent.locks.ReentrantLock;
 
 public class Gate implements Runnable {
 
+    public static boolean ErrorFlag = false;
     // port to listen to cars from traffic generator
-    private final int gateTcpPort;
+    public final int gateTcpPort;
     // port to listen to http requests
     private final int gateHttpPort;
     // D the cost to transfer the car to the parking lot
@@ -36,6 +37,7 @@ public class Gate implements Runnable {
     private final Condition queueNotEmpty = waitingQLock.newCondition();
     private final MonitorConnection monitorConn;
     private final GateAddressBook gateAddressBook = new GateAddressBook();
+    protected int gateWithErrorPort = 0;
     private SyncClock clock;
     private TokenStore tokenStore;
     private ParkingSpaceConnection parkingSpaceConn;
@@ -43,9 +45,15 @@ public class Gate implements Runnable {
     private volatile int carsProcessedCount = 0;
     private HttpServer httpServer;
     private ServerSocket carsAcceptor;
+    private volatile long lastTimeProcessedCar = 0L;
 
     public Gate(String monitorHttpAddr, int gatePort, int httpPort, long tranferDuration, String trafGenAddr, int
             trafGenPort) {
+        if (!ErrorFlag && gateWithErrorPort == 0 && Math.random() > 0.5) {
+            ErrorFlag = true;
+            gateWithErrorPort = gatePort;
+        }
+
         this.waitingQueue = new ConcurrentLinkedQueue<CarArrival>();
         this.gateTcpPort = gatePort;
         this.gateHttpPort = httpPort;
@@ -75,6 +83,15 @@ public class Gate implements Runnable {
 
     private static void log(String msg) {
         System.out.println("INFO: " + msg);
+    }
+
+    public long getLastTimeProcessedCar() {
+        return lastTimeProcessedCar;
+    }
+
+    public void fixError() {
+        ErrorFlag = false;
+        gateWithErrorPort = 0;
     }
 
     public long getTotalWaitingTime() {
@@ -195,6 +212,13 @@ public class Gate implements Runnable {
 
     // add a car to the waiting queue
     private void queueIn(Car car) {
+
+        if (ErrorFlag && gateWithErrorPort == this.gateTcpPort) {
+            reportError("gate is not letting cars in the queue");
+            // this.fixError();
+            return;
+        }
+
         long arrivalTime = 0L;
         arrivalTime = this.clock.getTime();
 
@@ -216,6 +240,7 @@ public class Gate implements Runnable {
                 currentTime = this.clock.getTime();
                 if (currentTime > next.car.getDepartureTimestamp()) {
                     totalWaitingTime = currentTime - next.arrivalTime;
+                    this.lastTimeProcessedCar = currentTime;
                     carsProcessedCount++;
                     continue;
                 }

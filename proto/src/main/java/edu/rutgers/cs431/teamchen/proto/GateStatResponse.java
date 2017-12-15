@@ -4,4 +4,5 @@ public class GateStatResponse {
     // stats for updating the average
     public long totalWaitingTime;
     public int totalCarsProcessed;
+    public long lastTimeProcessedCar = 0L;
 }

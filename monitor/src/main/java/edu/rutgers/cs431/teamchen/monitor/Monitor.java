@@ -105,6 +105,7 @@ public class Monitor implements Runnable {
 			conn.disconnect();
 			info.totalWaitingTime = gsr.totalWaitingTime;
 			info.totalCarsProcessed = gsr.totalCarsProcessed;
+			info.lastTimeProcessedCar = gsr.lastTimeProcessedCar;
 		} catch (MalformedURLException ex) {
 			reportError("updateStatesFromGateAt " + info.httpAddress + ": invalid url? " + ex.getMessage());
 			return;
@@ -113,6 +114,30 @@ public class Monitor implements Runnable {
 					.getMessage());
 			return;
 		}
+	}
+
+	public void checkForError() {
+		long totalTime = 0;
+		for (GateInfo gi : this.gates) {
+			totalTime += gi.lastTimeProcessedCar;
+		}
+		long averageTime = totalTime / this.gates.size();
+
+		ArrayList<Long> timeDiff = new ArrayList<Long>();
+		for (GateInfo gi : this.gates) {
+			timeDiff.add(averageTime - gi.lastTimeProcessedCar);
+		}
+
+		GateInfo errorGate = null;
+		Long lowestTime = Long.MAX_VALUE;
+		for (int i = 0; i < timeDiff.size(); i++) {
+			if (timeDiff.get(i) < lowestTime) {
+				lowestTime = timeDiff.get(i);
+				errorGate = this.gates.get(i);
+			}
+		}
+		reportError("Gate with Byzantine error: " + errorGate.httpAddress);
+
 	}
 
 	private void sendAddrChangeToGate(GateHttpAddressesChangeRequest req, String gateURL) {
@@ -222,7 +247,8 @@ public class Monitor implements Runnable {
 			new Thread(() -> updateStatsFromGateAt(gi)).start();
 		}
 		gatesLock.unlock();
-		
+		checkForError();
+
 		System.out.println("\n");
 		System.out.println("Monitor Update");
 		System.out.println("_______________________________________________________");

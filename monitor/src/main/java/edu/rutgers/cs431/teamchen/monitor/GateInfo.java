@@ -7,4 +7,6 @@ public class GateInfo {
     public TrafficGeneratorProto.GateAddress addr;
     public volatile long totalWaitingTime;
     public volatile int totalCarsProcessed;
+
+    public volatile long lastTimeProcessedCar;
 }
